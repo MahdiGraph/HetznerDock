@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import axios from '../api/axios';
 import { message } from 'antd';
+import * as authService from '../api/services/authService';
 
 const AuthContext = createContext();
 
@@ -15,10 +15,10 @@ export const AuthProvider = ({ children }) => {
       if (token) {
         try {
           // Get current user
-          const response = await axios.get('/auth/me');
-          setUser(response.data);
+          const userData = await authService.getCurrentUser();
+          setUser(userData);
         } catch (error) {
-          // If token is invalid, remove it
+          console.error('Failed to get user data:', error);
           localStorage.removeItem('token');
         }
       }
@@ -31,17 +31,12 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (username, password) => {
     try {
-      // Use FormData for OAuth2 compatibility
-      const formData = new FormData();
-      formData.append('username', username);
-      formData.append('password', password);
-      
-      const response = await axios.post('/auth/token', formData);
-      localStorage.setItem('token', response.data.access_token);
+      const data = await authService.login(username, password);
+      localStorage.setItem('token', data.access_token);
       
       // Get user info after login
-      const userResponse = await axios.get('/auth/me');
-      setUser(userResponse.data);
+      const userData = await authService.getCurrentUser();
+      setUser(userData);
       
       return true;
     } catch (error) {
@@ -55,16 +50,13 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    window.location.href = '/login';
   };
   
   // Change password function
   const changePassword = async (oldPassword, newPassword) => {
     try {
-      await axios.post('/auth/change-password', {
-        old_password: oldPassword,
-        new_password: newPassword
-      });
-      
+      await authService.changePassword(oldPassword, newPassword);
       message.success('Password changed successfully!');
       return true;
     } catch (error) {

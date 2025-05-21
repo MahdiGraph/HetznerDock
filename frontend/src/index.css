@@ -5,9 +5,75 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #f0f2f5;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Logo styling */
+.logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 20px;
+  transition: all 0.3s;
+}
+
+/* Sidebar trigger */
+.trigger {
+  padding: 0 24px;
+  font-size: 18px;
+  line-height: 64px;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.trigger:hover {
+  color: #1677ff;
+}
+
+/* Dashboard cards */
+.dashboard-card {
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s;
+}
+
+.dashboard-card:hover {
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Status colors */
+.status-running {
+  color: #52c41a;
+}
+
+.status-off {
+  color: #ff4d4f;
+}
+
+.status-creating {
+  color: #1677ff;
+}
+
+.status-rebuilding {
+  color: #faad14;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ant-table {
+    font-size: 12px;
+  }
+  
+  .ant-table .ant-btn {
+    padding: 0 8px;
+    font-size: 12px;
+  }
 }
