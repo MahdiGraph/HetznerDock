@@ -8,7 +8,7 @@ import {
   HddOutlined, ReloadOutlined, DownOutlined, EditOutlined,
   SafetyOutlined, UndoOutlined, SaveOutlined, KeyOutlined,
   GlobalOutlined, TagOutlined, CameraOutlined, DesktopOutlined,
-  UpgradeOutlined
+  RiseOutlined
 } from '@ant-design/icons';
 import * as serverService from '../../api/services/serverService';
 import moment from 'moment';
@@ -382,7 +382,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       </Menu.Item>
       
       <Menu.Item key="change_type" onClick={() => setChangeTypeModalVisible(true)}>
-        <UpgradeOutlined /> Change Server Type
+        <RiseOutlined /> Change Server Type
       </Menu.Item>
       
       <Menu.Divider />
