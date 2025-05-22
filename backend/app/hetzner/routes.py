@@ -199,6 +199,9 @@ class ServerEnableRescue(BaseModel):
 class ServerAttachISO(BaseModel):
     iso: str  # ISO name or ID
 
+class ServerRename(BaseModel):
+    name: str
+
 # Helper function to get Hetzner client
 def get_hetzner_client(project_id: int, db: Session, user: models.User):
     project = crud.get_project(db, project_id, user.id)
@@ -983,27 +986,52 @@ def list_server_types(
                 "disk": st.disk,
                 "prices": []
             }
+            
             # Safely handle prices
             if hasattr(st, 'prices') and st.prices:
-                for price in st.prices:
-                    try:
-                        # Safely access price attributes
-                        location_name = "unknown"
-                        if hasattr(price, 'location') and price.location:
-                            location_name = price.location.name
-                        price_monthly = 0
-                        if hasattr(price, 'price_monthly') and price.price_monthly:
-                            if hasattr(price.price_monthly, 'gross'):
-                                price_monthly = price.price_monthly.gross
-                        price_data = {
-                            "location": location_name,
-                            "price_monthly": price_monthly
-                        }
-                        server_type_data["prices"].append(price_data)
-                    except Exception as e:
-                        # Skip this price if there's an issue
-                        continue
+                try:
+                    for price in st.prices:
+                        try:
+                            # Safely access price attributes
+                            location_name = "unknown"
+                            if hasattr(price, 'location') and price.location:
+                                location_name = price.location.name if hasattr(price.location, 'name') else "unknown"
+                            
+                            price_monthly = 0
+                            
+                            # Try multiple paths to get the price
+                            if hasattr(price, 'price_monthly'):
+                                if hasattr(price.price_monthly, 'gross'):
+                                    price_monthly = float(price.price_monthly.gross)
+                                elif hasattr(price.price_monthly, 'net'):
+                                    price_monthly = float(price.price_monthly.net)
+                                elif isinstance(price.price_monthly, (int, float, str)):
+                                    try:
+                                        price_monthly = float(price.price_monthly)
+                                    except (ValueError, TypeError):
+                                        pass
+                            
+                            # Also try direct pricing info if it exists
+                            if hasattr(price, 'gross') and price_monthly == 0:
+                                try:
+                                    price_monthly = float(price.gross)
+                                except (ValueError, TypeError):
+                                    pass
+                            
+                            # If we found a price via any method, add it
+                            price_data = {
+                                "location": location_name,
+                                "price_monthly": price_monthly
+                            }
+                            server_type_data["prices"].append(price_data)
+                        except Exception as e:
+                            print(f"Error processing price: {str(e)}")
+                            continue
+                except Exception as e:
+                    print(f"Error iterating prices: {str(e)}")
+            
             result.append(server_type_data)
+        
         return {
             "server_types": result
         }
@@ -1018,9 +1046,9 @@ def list_server_types(
             project_id=project.id,
             user_id=current_user.id
         )
-        print(f"Server types error: {error_detail}")  # Print to server logs
+        print(f"Server types error: {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
-
+    
 # SSH Keys endpoints
 @router.get("/projects/{project_id}/ssh_keys")
 def list_ssh_keys(
@@ -2527,7 +2555,6 @@ def list_isos(
         )
         raise HTTPException(status_code=500, detail=f"Error retrieving ISOs: {str(e)}")
 
-# Pricing endpoint
 @router.get("/projects/{project_id}/pricing")
 def get_pricing(
     project_id: int,
@@ -2548,50 +2575,94 @@ def get_pricing(
             user_id=current_user.id
         )
         
-        # Extract pricing data
+        # Extract pricing data safely
         pricing_data = {}
         
         # Server types
         if hasattr(pricing, "server_types"):
             pricing_data["server_types"] = {}
-            for server_type, prices in pricing.server_types.items():
-                pricing_data["server_types"][server_type] = {
-                    "monthly": prices.price_monthly.gross if hasattr(prices.price_monthly, "gross") else None,
-                    "hourly": prices.price_hourly.gross if hasattr(prices.price_hourly, "gross") else None
-                }
+            try:
+                for server_type, prices in pricing.server_types.items():
+                    try:
+                        monthly = None
+                        hourly = None
+                        
+                        if hasattr(prices, "price_monthly") and prices.price_monthly:
+                            if hasattr(prices.price_monthly, "gross"):
+                                monthly = float(prices.price_monthly.gross)
+                            elif hasattr(prices.price_monthly, "net"):
+                                monthly = float(prices.price_monthly.net)
+                        
+                        if hasattr(prices, "price_hourly") and prices.price_hourly:
+                            if hasattr(prices.price_hourly, "gross"):
+                                hourly = float(prices.price_hourly.gross)
+                            elif hasattr(prices.price_hourly, "net"):
+                                hourly = float(prices.price_hourly.net)
+                        
+                        pricing_data["server_types"][server_type] = {
+                            "monthly": monthly,
+                            "hourly": hourly
+                        }
+                    except Exception:
+                        # Skip this server type if there's an issue
+                        continue
+            except Exception:
+                # Handle case where server_types is not iterable
+                pass
         
-        # Image prices
-        if hasattr(pricing, "images"):
+        # Images
+        if hasattr(pricing, "images") and pricing.images:
+            price_per_gb = None
+            try:
+                if hasattr(pricing.images, "price_per_gb_month"):
+                    if hasattr(pricing.images.price_per_gb_month, "gross"):
+                        price_per_gb = float(pricing.images.price_per_gb_month.gross)
+                    elif hasattr(pricing.images.price_per_gb_month, "net"):
+                        price_per_gb = float(pricing.images.price_per_gb_month.net)
+            except Exception:
+                pass
+            
             pricing_data["images"] = {
-                "price_per_gb_month": pricing.images.price_per_gb_month.gross if hasattr(pricing.images.price_per_gb_month, "gross") else None
+                "price_per_gb_month": price_per_gb
             }
+        
+        # Volumes
+        if hasattr(pricing, "volumes") and pricing.volumes:
+            price_per_gb = None
+            try:
+                if hasattr(pricing.volumes, "price_per_gb_month"):
+                    if hasattr(pricing.volumes.price_per_gb_month, "gross"):
+                        price_per_gb = float(pricing.volumes.price_per_gb_month.gross)
+                    elif hasattr(pricing.volumes.price_per_gb_month, "net"):
+                        price_per_gb = float(pricing.volumes.price_per_gb_month.net)
+            except Exception:
+                pass
             
-        # Volume prices
-        if hasattr(pricing, "volumes"):
             pricing_data["volumes"] = {
-                "price_per_gb_month": pricing.volumes.price_per_gb_month.gross if hasattr(pricing.volumes.price_per_gb_month, "gross") else None
+                "price_per_gb_month": price_per_gb
             }
+        
+        # Floating IPs
+        if hasattr(pricing, "floating_ips") and pricing.floating_ips:
+            price_monthly = None
+            try:
+                if hasattr(pricing.floating_ips, "price_monthly"):
+                    if hasattr(pricing.floating_ips.price_monthly, "gross"):
+                        price_monthly = float(pricing.floating_ips.price_monthly.gross)
+                    elif hasattr(pricing.floating_ips.price_monthly, "net"):
+                        price_monthly = float(pricing.floating_ips.price_monthly.net)
+            except Exception:
+                pass
             
-        # Floating IP prices
-        if hasattr(pricing, "floating_ips"):
             pricing_data["floating_ips"] = {
-                "price_monthly": pricing.floating_ips.price_monthly.gross if hasattr(pricing.floating_ips.price_monthly, "gross") else None
+                "price_monthly": price_monthly
             }
-            
-        # Load balancer prices
-        if hasattr(pricing, "load_balancers"):
-            pricing_data["load_balancers"] = {}
-            for lb_type, prices in pricing.load_balancers.items():
-                pricing_data["load_balancers"][lb_type] = {
-                    "monthly": prices.price_monthly.gross if hasattr(prices.price_monthly, "gross") else None,
-                    "hourly": prices.price_hourly.gross if hasattr(prices.price_hourly, "gross") else None
-                }
         
         # Return the extracted pricing data
         return pricing_data
         
     except Exception as e:
-        # Log error
+        # Log error with more details
         log_action(
             db=db,
             action="PRICING_GET",
@@ -2600,9 +2671,9 @@ def get_pricing(
             project_id=project.id,
             user_id=current_user.id
         )
+        print(f"Pricing error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving pricing information: {str(e)}")
-
-# Actions (audit log) endpoint
+    
 @router.get("/projects/{project_id}/actions")
 def list_actions(
     project_id: int,
@@ -2618,12 +2689,7 @@ def list_actions(
     """Get action logs from Hetzner API with filtering and pagination"""
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
-        # Prepare query parameters
-        params = {
-            'page': page,
-            'per_page': per_page
-        }
-        
+        # Get actions based on filters
         if resource_type and resource_id:
             # If both resource type and ID are provided
             if resource_type == 'server':
@@ -2654,48 +2720,88 @@ def list_actions(
             user_id=current_user.id
         )
         
-        return {
-            "actions": [
-                {
+        result_actions = []
+        for action in actions:
+            try:
+                action_data = {
                     "id": action.id,
-                    "command": action.command,
-                    "status": action.status,
-                    "progress": action.progress,
-                    "started": action.started.isoformat() if action.started else None,
-                    "finished": action.finished.isoformat() if action.finished else None,
-                    "resources": [
-                        {
-                            "id": resource.id,
-                            "type": resource.type
-                        } for resource in action.resources
-                    ],
-                    "error": {
-                        "code": action.error["code"] if action.error and "code" in action.error else None,
-                        "message": action.error["message"] if action.error and "message" in action.error else None
-                    } if action.error else None
+                    "command": action.command if hasattr(action, 'command') else "unknown",
+                    "status": action.status if hasattr(action, 'status') else "unknown",
+                    "progress": action.progress if hasattr(action, 'progress') else 0,
+                    "started": action.started.isoformat() if hasattr(action, 'started') and action.started else None,
+                    "finished": action.finished.isoformat() if hasattr(action, 'finished') and action.finished else None,
+                    "resources": [],
+                    "error": None
                 }
-                for action in actions
-            ],
+                
+                # Safely extract resources
+                if hasattr(action, 'resources') and action.resources:
+                    for resource in action.resources:
+                        try:
+                            resource_data = {
+                                "id": resource.id if hasattr(resource, 'id') else None,
+                                "type": resource.type if hasattr(resource, 'type') else "unknown"
+                            }
+                            action_data["resources"].append(resource_data)
+                        except Exception:
+                            # Skip this resource if there's an issue
+                            continue
+                
+                # Safely extract error
+                if hasattr(action, 'error') and action.error:
+                    try:
+                        if isinstance(action.error, dict):
+                            action_data["error"] = {
+                                "code": action.error.get("code"),
+                                "message": action.error.get("message")
+                            }
+                        else:
+                            # Handle case where error is not a dictionary
+                            action_data["error"] = {
+                                "code": None,
+                                "message": str(action.error)
+                            }
+                    except Exception:
+                        # If we can't extract error details, just set to None
+                        action_data["error"] = None
+                
+                result_actions.append(action_data)
+            except Exception as e:
+                # Skip this action if there's an issue
+                print(f"Error processing action: {str(e)}")
+                continue
+        
+        # Make sure we have consistent pagination metadata
+        total_entries = 0
+        try:
+            total_entries = getattr(actions, "total_entries", len(result_actions))
+        except Exception:
+            total_entries = len(result_actions)
+        
+        return {
+            "actions": result_actions,
             "meta": {
                 "pagination": {
                     "page": page,
                     "per_page": per_page,
-                    "total_entries": getattr(actions, "total_entries", None)
+                    "total_entries": total_entries
                 }
             }
         }
     except Exception as e:
-        # Log error
+        # Log error with more details
+        error_details = f"Error retrieving action logs: {str(e)}"
         log_action(
             db=db,
             action="ACTIONS_LIST",
-            details=f"Error retrieving action logs: {str(e)}",
+            details=error_details,
             status="failed",
             project_id=project.id,
             user_id=current_user.id
         )
-        raise HTTPException(status_code=500, detail=f"Error retrieving action logs: {str(e)}")
-
+        print(error_details)
+        raise HTTPException(status_code=500, detail=error_details)
+    
 # Logs endpoint
 @router.get("/projects/{project_id}/logs", response_model=List[LogResponse])
 def get_project_logs(
@@ -2714,3 +2820,55 @@ def get_project_logs(
         raise HTTPException(status_code=404, detail=f"Project with ID {project_id} not found")
     logs = crud.get_logs(db, project_id, current_user.id, skip, limit, start_date, end_date)
     return logs
+
+@router.put("/projects/{project_id}/servers/{server_id}/rename")
+def rename_server(
+    project_id: int,
+    server_id: int,
+    rename_data: ServerRename,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Rename a server"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        server.update(name=rename_data.name)
+        
+        # Log server rename
+        log_action(
+            db=db,
+            action="SERVER_RENAME",
+            details=f"Server {server_id} renamed to '{rename_data.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        # Get updated server details
+        updated_server = client.servers.get_by_id(server_id)
+        
+        return {
+            "message": f"Server renamed successfully to '{rename_data.name}'",
+            "server": {
+                "id": updated_server.id,
+                "name": updated_server.name,
+                "status": updated_server.status.lower(),
+                "ip": updated_server.public_net.ipv4.ip if updated_server.public_net and updated_server.public_net.ipv4 else None,
+                "location": updated_server.datacenter.location.name if updated_server.datacenter and updated_server.datacenter.location else None,
+                "server_type": updated_server.server_type.name if updated_server.server_type else None,
+                "image": updated_server.image.name if updated_server.image else None,
+                "created": updated_server.created.isoformat() if updated_server.created else None
+            }
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_RENAME",
+            details=f"Error renaming server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error renaming server: {str(e)}")

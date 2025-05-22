@@ -90,3 +90,8 @@ export const getActions = async (projectId, params = {}) => {
   const response = await api.get(`/projects/${projectId}/actions`, { params });
   return response.data;
 };
+
+export const renameServer = async (projectId, serverId, newName) => {
+  const response = await api.put(`/projects/${projectId}/servers/${serverId}/rename`, { name: newName });
+  return response.data;
+};

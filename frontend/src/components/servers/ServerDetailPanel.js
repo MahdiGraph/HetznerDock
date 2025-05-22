@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Descriptions, Button, Card, Space, message, Statistic, Row, Col, Tag, Menu, Dropdown
+  Descriptions, Button, Card, Space, message, Statistic, Row, Col, Tag, Menu, Dropdown, Modal, Form, Input
 } from 'antd';
 import {
   PoweroffOutlined, PlayCircleOutlined, RedoOutlined,
   LoadingOutlined, ArrowUpOutlined, ClockCircleOutlined,
-  HddOutlined, ReloadOutlined, DownOutlined,
+  HddOutlined, ReloadOutlined, DownOutlined, EditOutlined,
   SafetyOutlined, UndoOutlined, SaveOutlined
 } from '@ant-design/icons';
 import * as serverService from '../../api/services/serverService';
@@ -15,6 +15,8 @@ import RescueModeModal from './RescueModeModal';
 import AttachISOModal from './AttachISOModal';
 
 function ServerDetailPanel({ projectId, serverId }) {
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [serverNewName, setServerNewName] = useState('');
   const [server, setServer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -120,6 +122,20 @@ function ServerDetailPanel({ projectId, serverId }) {
     }
   };
 
+  const handleRenameServer = async () => {
+    try {
+      setActionLoading(true);
+      await serverService.renameServer(projectId, serverId, serverNewName);
+      message.success('Server renamed successfully');
+      setRenameModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to rename server: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleAttachISO = async (iso) => {
     try {
       setActionLoading(true);
@@ -195,6 +211,13 @@ function ServerDetailPanel({ projectId, serverId }) {
 
   const actionsMenu = (
     <Menu>
+      <Menu.Item key="rename" onClick={() => {
+        setServerNewName(server.name);
+        setRenameModalVisible(true);
+      }}>
+        <EditOutlined /> Rename Server
+      </Menu.Item>
+      <Menu.Divider />
       <Menu.Item key="rebuild" onClick={() => setRebuildModalVisible(true)}>
         <ReloadOutlined /> Rebuild Server
       </Menu.Item>
@@ -355,6 +378,27 @@ function ServerDetailPanel({ projectId, serverId }) {
         onSubmit={handleAttachISO}
         projectId={projectId}
       />
+
+      <Modal
+        title="Rename Server"
+        open={renameModalVisible}
+        onCancel={() => setRenameModalVisible(false)}
+        onOk={handleRenameServer}
+        confirmLoading={actionLoading}
+      >
+        <Form layout="vertical">
+          <Form.Item
+            label="New Server Name"
+            rules={[{ required: true, message: 'Please enter a new name for the server' }]}
+          >
+            <Input
+              value={serverNewName}
+              onChange={e => setServerNewName(e.target.value)}
+              placeholder="Enter new server name"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }
