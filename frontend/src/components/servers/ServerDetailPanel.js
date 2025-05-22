@@ -6,13 +6,22 @@ import {
   PoweroffOutlined, PlayCircleOutlined, RedoOutlined,
   LoadingOutlined, ArrowUpOutlined, ClockCircleOutlined,
   HddOutlined, ReloadOutlined, DownOutlined, EditOutlined,
-  SafetyOutlined, UndoOutlined, SaveOutlined
+  SafetyOutlined, UndoOutlined, SaveOutlined, KeyOutlined,
+  GlobalOutlined, TagOutlined, CameraOutlined, DesktopOutlined,
+  UpgradeOutlined
 } from '@ant-design/icons';
 import * as serverService from '../../api/services/serverService';
 import moment from 'moment';
 import RebuildServerModal from './RebuildServerModal';
 import RescueModeModal from './RescueModeModal';
 import AttachISOModal from './AttachISOModal';
+import ChangePasswordModal from './ChangePasswordModal';
+import ChangeTypeModal from './ChangeTypeModal';
+import ProtectionModal from './ProtectionModal';
+import RdnsModal from './RdnsModal';
+import LabelsModal from './LabelsModal';
+import CreateImageModal from './CreateImageModal';
+import ConsoleModal from './ConsoleModal';
 
 function ServerDetailPanel({ projectId, serverId }) {
   const [renameModalVisible, setRenameModalVisible] = useState(false);
@@ -26,6 +35,16 @@ function ServerDetailPanel({ projectId, serverId }) {
   const [rescueModalVisible, setRescueModalVisible] = useState(false);
   const [isoModalVisible, setISOModalVisible] = useState(false);
   const [rootPassword, setRootPassword] = useState(null);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
+  const [changeTypeModalVisible, setChangeTypeModalVisible] = useState(false);
+  const [protectionModalVisible, setProtectionModalVisible] = useState(false);
+  const [enableProtection, setEnableProtection] = useState(true);
+  const [rdnsModalVisible, setRdnsModalVisible] = useState(false);
+  const [labelsModalVisible, setLabelsModalVisible] = useState(false);
+  const [createImageModalVisible, setCreateImageModalVisible] = useState(false);
+  const [consoleModalVisible, setConsoleModalVisible] = useState(false);
+  const [consoleData, setConsoleData] = useState(null);
+  const [consoleError, setConsoleError] = useState(null);
 
   useEffect(() => {
     fetchServerDetails();
@@ -135,6 +154,146 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
+  
+  const handleChangePassword = async (password) => {
+    try {
+      setActionLoading(true);
+      const result = await serverService.changeServerPassword(projectId, serverId, password);
+      message.success('Password changed successfully');
+      setPasswordModalVisible(false);
+      
+      // اگر پسورد جدید در پاسخ باشد، آن را نمایش می‌دهیم
+      if (result.root_password) {
+        setRootPassword(result.root_password);
+      }
+    } catch (error) {
+      message.error(`Failed to change password: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleChangeType = async (serverType, upgradeDisk) => {
+    try {
+      setActionLoading(true);
+      await serverService.changeServerType(projectId, serverId, serverType, upgradeDisk);
+      message.success(`Server type change to ${serverType} initiated. This may take a few minutes.`);
+      setChangeTypeModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to change server type: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleProtection = async (protection) => {
+    try {
+      setActionLoading(true);
+      
+      if (enableProtection) {
+        await serverService.enableServerProtection(projectId, serverId, protection);
+        message.success('Server protection enabled successfully');
+      } else {
+        await serverService.disableServerProtection(projectId, serverId, protection);
+        message.success('Server protection disabled successfully');
+      }
+      
+      setProtectionModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to update protection: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleChangeRdns = async (ip, dnsPtr) => {
+    try {
+      setActionLoading(true);
+      await serverService.changeServerRdns(projectId, serverId, ip, dnsPtr);
+      message.success('Reverse DNS updated successfully');
+      setRdnsModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to update reverse DNS: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleUpdateLabels = async (labels) => {
+    try {
+      setActionLoading(true);
+      await serverService.updateServerLabels(projectId, serverId, labels);
+      message.success('Labels updated successfully');
+      setLabelsModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to update labels: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleCreateImage = async (imageData) => {
+    try {
+      setActionLoading(true);
+      const result = await serverService.createServerImage(projectId, serverId, imageData);
+      message.success(`Image created successfully: ${result.image.description}`);
+      setCreateImageModalVisible(false);
+      
+      // اگر پسورد نیاز باشد
+      if (result.root_password) {
+        setRootPassword(result.root_password);
+      }
+    } catch (error) {
+      message.error(`Failed to create image: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleRequestConsole = async () => {
+    try {
+      setActionLoading(true);
+      setConsoleError(null);
+      const result = await serverService.requestServerConsole(projectId, serverId);
+      setConsoleData(result);
+      setConsoleModalVisible(true);
+    } catch (error) {
+      setConsoleError(`Failed to request console: ${error.response?.data?.detail || error.message}`);
+      setConsoleModalVisible(true);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+  
+  const handleResetPassword = async () => {
+    Modal.confirm({
+      title: 'Reset Server Password',
+      content: 'Are you sure you want to reset the root password? This will generate a new random password.',
+      okText: 'Yes, Reset Password',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          setActionLoading(true);
+          const result = await serverService.resetServerPassword(projectId, serverId);
+          message.success('Password reset successfully');
+          
+          if (result.root_password) {
+            setRootPassword(result.root_password);
+          }
+        } catch (error) {
+          message.error(`Failed to reset password: ${error.response?.data?.detail || error.message}`);
+        } finally {
+          setActionLoading(false);
+        }
+      }
+    });
+  };
+
 
   const handleAttachISO = async (iso) => {
     try {
@@ -217,27 +376,79 @@ function ServerDetailPanel({ projectId, serverId }) {
       }}>
         <EditOutlined /> Rename Server
       </Menu.Item>
+      
+      <Menu.Item key="change_password" onClick={() => setPasswordModalVisible(true)}>
+        <KeyOutlined /> Change Password
+      </Menu.Item>
+      
+      <Menu.Item key="change_type" onClick={() => setChangeTypeModalVisible(true)}>
+        <UpgradeOutlined /> Change Server Type
+      </Menu.Item>
+      
       <Menu.Divider />
+      
+      <Menu.Item key="enable_protection" onClick={() => {
+        setEnableProtection(true);
+        setProtectionModalVisible(true);
+      }}>
+        <SafetyOutlined /> Enable Protection
+      </Menu.Item>
+      
+      <Menu.Item key="disable_protection" onClick={() => {
+        setEnableProtection(false);
+        setProtectionModalVisible(true);
+      }}>
+        <SafetyOutlined /> Disable Protection
+      </Menu.Item>
+      
+      <Menu.Divider />
+      
+      <Menu.Item key="rdns" onClick={() => setRdnsModalVisible(true)}>
+        <GlobalOutlined /> Manage Reverse DNS
+      </Menu.Item>
+      
+      <Menu.Item key="labels" onClick={() => setLabelsModalVisible(true)}>
+        <TagOutlined /> Manage Labels
+      </Menu.Item>
+      
+      <Menu.Divider />
+      
+      <Menu.Item key="create_image" onClick={() => setCreateImageModalVisible(true)}>
+        <CameraOutlined /> Create Image/Snapshot
+      </Menu.Item>
+      
+      <Menu.Item key="request_console" onClick={handleRequestConsole}>
+        <DesktopOutlined /> Access Console
+      </Menu.Item>
+      
+      <Menu.Item key="reset_password" onClick={handleResetPassword}>
+        <KeyOutlined /> Reset Password
+      </Menu.Item>
+      
+      <Menu.Divider />
+      
       <Menu.Item key="rebuild" onClick={() => setRebuildModalVisible(true)}>
         <ReloadOutlined /> Rebuild Server
       </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="rescue_enable" onClick={() => setRescueModalVisible(true)}>
+      
+      <Menu.Item key="reset" onClick={() => handleServerAction('reset', 'Reset')}>
+        <UndoOutlined /> Hard Reset
+      </Menu.Item>
+      
+      <Menu.Item key="rescue_mode" onClick={() => setRescueModalVisible(true)}>
         <SafetyOutlined /> Enable Rescue Mode
       </Menu.Item>
-      <Menu.Item key="rescue_disable" onClick={handleDisableRescue}>
+      
+      <Menu.Item key="disable_rescue" onClick={handleDisableRescue}>
         <SafetyOutlined /> Disable Rescue Mode
       </Menu.Item>
-      <Menu.Divider />
+      
       <Menu.Item key="iso_attach" onClick={() => setISOModalVisible(true)}>
         <SaveOutlined /> Attach ISO
       </Menu.Item>
+      
       <Menu.Item key="iso_detach" onClick={handleDetachISO}>
         <SaveOutlined /> Detach ISO
-      </Menu.Item>
-      <Menu.Divider />
-      <Menu.Item key="reset" onClick={() => handleServerAction('reset', 'Reset')}>
-        <UndoOutlined /> Hard Reset
       </Menu.Item>
     </Menu>
   );
@@ -399,6 +610,22 @@ function ServerDetailPanel({ projectId, serverId }) {
           </Form.Item>
         </Form>
       </Modal>
+      
+      <ChangePasswordModal 
+        visible={passwordModalVisible}
+        onCancel={() => setPasswordModalVisible(false)}
+        onSubmit={handleChangePassword}
+        loading={actionLoading}
+      />
+      
+      <ChangeTypeModal
+        visible={changeTypeModalVisible}
+        onCancel={() => setChangeTypeModalVisible(false)}
+        onSubmit={handleChangeType}
+        projectId={projectId}
+        currentType={server?.server_type}
+        loading={actionLoading}
+      />
     </div>
   );
 }

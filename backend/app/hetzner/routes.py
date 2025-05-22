@@ -2827,3 +2827,423 @@ def rename_server(
             user_id=current_user.id
         )
         raise HTTPException(status_code=500, detail=f"Error renaming server: {str(e)}")
+    
+# مدل‌های جدید مدیریت سرور
+class ServerChangePassword(BaseModel):
+    password: str
+
+class ServerChangeType(BaseModel):
+    server_type: str
+    upgrade_disk: Optional[bool] = True
+
+class ServerProtection(BaseModel):
+    delete: Optional[bool] = True
+    rebuild: Optional[bool] = True
+
+class ServerRdnsSettings(BaseModel):
+    ip: str
+    dns_ptr: str
+
+class ServerLabels(BaseModel):
+    labels: Dict[str, str]
+
+class ServerImage(BaseModel):
+    type: Optional[str] = "snapshot"  # snapshot یا backup
+    description: Optional[str] = None
+    labels: Optional[Dict[str, str]] = None
+
+# تغییر پسورد سرور
+@router.post("/projects/{project_id}/servers/{server_id}/change_password")
+def change_server_password(
+    project_id: int,
+    server_id: int,
+    password_data: ServerChangePassword,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Change a server's root password"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        response = server.change_password(password_data.password)
+        
+        # Log password change
+        log_action(
+            db=db,
+            action="SERVER_CHANGE_PASSWORD",
+            details=f"Password changed for server '{server.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Password changed successfully for server '{server.name}'",
+            "root_password": response.root_password if hasattr(response, "root_password") else None
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_CHANGE_PASSWORD",
+            details=f"Error changing password for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error changing server password: {str(e)}")
+
+# تغییر نوع سرور (ارتقا/کاهش)
+@router.post("/projects/{project_id}/servers/{server_id}/change_type")
+def change_server_type(
+    project_id: int,
+    server_id: int,
+    type_data: ServerChangeType,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Change a server's type/plan"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        server_type = client.server_types.get_by_name(type_data.server_type)
+        
+        if not server_type:
+            raise HTTPException(status_code=404, detail=f"Server type '{type_data.server_type}' not found")
+        
+        server.change_type(
+            server_type=type_data.server_type,
+            upgrade_disk=type_data.upgrade_disk
+        )
+        
+        # Log server type change
+        log_action(
+            db=db,
+            action="SERVER_CHANGE_TYPE",
+            details=f"Server '{server.name}' type changed to '{type_data.server_type}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Server type changing to '{type_data.server_type}'. This may take a few minutes to complete."
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_CHANGE_TYPE",
+            details=f"Error changing type for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error changing server type: {str(e)}")
+
+# فعال کردن محافظت سرور
+@router.post("/projects/{project_id}/servers/{server_id}/enable_protection")
+def enable_server_protection(
+    project_id: int,
+    server_id: int,
+    protection_data: ServerProtection,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Enable protection for a server (delete and/or rebuild protection)"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        server.enable_protection(delete=protection_data.delete, rebuild=protection_data.rebuild)
+        
+        # Log protection enablement
+        protections = []
+        if protection_data.delete:
+            protections.append("delete")
+        if protection_data.rebuild:
+            protections.append("rebuild")
+        
+        log_action(
+            db=db,
+            action="SERVER_ENABLE_PROTECTION",
+            details=f"Enabled {', '.join(protections)} protection for server '{server.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Protection enabled for server '{server.name}'"
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_ENABLE_PROTECTION",
+            details=f"Error enabling protection for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error enabling server protection: {str(e)}")
+
+# غیرفعال کردن محافظت سرور
+@router.post("/projects/{project_id}/servers/{server_id}/disable_protection")
+def disable_server_protection(
+    project_id: int,
+    server_id: int,
+    protection_data: ServerProtection,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Disable protection for a server (delete and/or rebuild protection)"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        server.disable_protection(delete=protection_data.delete, rebuild=protection_data.rebuild)
+        
+        # Log protection disablement
+        protections = []
+        if protection_data.delete:
+            protections.append("delete")
+        if protection_data.rebuild:
+            protections.append("rebuild")
+        
+        log_action(
+            db=db,
+            action="SERVER_DISABLE_PROTECTION",
+            details=f"Disabled {', '.join(protections)} protection for server '{server.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Protection disabled for server '{server.name}'"
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_DISABLE_PROTECTION",
+            details=f"Error disabling protection for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error disabling server protection: {str(e)}")
+
+# تنظیم DNS معکوس
+@router.post("/projects/{project_id}/servers/{server_id}/change_rdns")
+def change_server_rdns(
+    project_id: int,
+    server_id: int,
+    rdns_data: ServerRdnsSettings,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Change reverse DNS settings for a server IP"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        server.change_rdns(ip=rdns_data.ip, dns_ptr=rdns_data.dns_ptr)
+        
+        # Log RDNS change
+        log_action(
+            db=db,
+            action="SERVER_CHANGE_RDNS",
+            details=f"Changed reverse DNS for server '{server.name}' IP {rdns_data.ip} to '{rdns_data.dns_ptr}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Reverse DNS changed successfully for server '{server.name}'"
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_CHANGE_RDNS",
+            details=f"Error changing reverse DNS for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error changing reverse DNS: {str(e)}")
+
+# به‌روزرسانی برچسب‌های سرور
+@router.put("/projects/{project_id}/servers/{server_id}/labels")
+def update_server_labels(
+    project_id: int,
+    server_id: int,
+    labels_data: ServerLabels,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Update labels for a server"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        server.update_labels(labels_data.labels)
+        
+        # Log labels update
+        log_action(
+            db=db,
+            action="SERVER_UPDATE_LABELS",
+            details=f"Updated labels for server '{server.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Labels updated successfully for server '{server.name}'",
+            "labels": labels_data.labels
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_UPDATE_LABELS",
+            details=f"Error updating labels for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error updating server labels: {str(e)}")
+
+# ایجاد تصویر/اسنپ‌شات از سرور
+@router.post("/projects/{project_id}/servers/{server_id}/create_image")
+def create_server_image(
+    project_id: int,
+    server_id: int,
+    image_data: ServerImage,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Create an image/snapshot from a server"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        response = server.create_image(
+            type=image_data.type,
+            description=image_data.description,
+            labels=image_data.labels
+        )
+        
+        # Log image creation
+        log_action(
+            db=db,
+            action="SERVER_CREATE_IMAGE",
+            details=f"Created {image_data.type} image for server '{server.name}': {response.image.description}",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Image created successfully from server '{server.name}'",
+            "image": {
+                "id": response.image.id,
+                "description": response.image.description,
+                "type": response.image.type,
+                "status": response.image.status,
+                "created": response.image.created.isoformat() if response.image.created else None
+            },
+            "root_password": response.root_password if hasattr(response, "root_password") else None
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_CREATE_IMAGE",
+            details=f"Error creating image for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error creating server image: {str(e)}")
+
+# دریافت URL دسترسی به کنسول
+@router.get("/projects/{project_id}/servers/{server_id}/request_console")
+def request_server_console(
+    project_id: int,
+    server_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Request VNC console access to a server"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        response = server.request_console()
+        
+        # Log console request
+        log_action(
+            db=db,
+            action="SERVER_REQUEST_CONSOLE",
+            details=f"Requested console access for server '{server.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Console access granted for server '{server.name}'",
+            "wss_url": response.wss_url,
+            "password": response.password,
+            "expires_at": response.expires.isoformat() if response.expires else None
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_REQUEST_CONSOLE",
+            details=f"Error requesting console for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error requesting server console: {str(e)}")
+
+# بازنشانی پسورد
+@router.post("/projects/{project_id}/servers/{server_id}/reset_password")
+def reset_server_password(
+    project_id: int,
+    server_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Reset a server's root password"""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        response = server.reset_password()
+        
+        # Log password reset
+        log_action(
+            db=db,
+            action="SERVER_RESET_PASSWORD",
+            details=f"Reset password for server '{server.name}'",
+            status="success",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        
+        return {
+            "message": f"Password reset successfully for server '{server.name}'",
+            "root_password": response.root_password if hasattr(response, "root_password") else None
+        }
+    except Exception as e:
+        # Log error
+        log_action(
+            db=db,
+            action="SERVER_RESET_PASSWORD",
+            details=f"Error resetting password for server {server_id}: {str(e)}",
+            status="failed",
+            project_id=project.id,
+            user_id=current_user.id
+        )
+        raise HTTPException(status_code=500, detail=f"Error resetting server password: {str(e)}")

@@ -95,3 +95,52 @@ export const renameServer = async (projectId, serverId, newName) => {
   const response = await api.put(`/projects/${projectId}/servers/${serverId}/rename`, { name: newName });
   return response.data;
 };
+
+// اضافه کردن متدهای جدید مدیریت سرور به انتهای فایل
+export const changeServerPassword = async (projectId, serverId, password) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/change_password`, { password });
+  return response.data;
+};
+
+export const changeServerType = async (projectId, serverId, serverType, upgradeDisk = true) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/change_type`, { 
+    server_type: serverType,
+    upgrade_disk: upgradeDisk
+  });
+  return response.data;
+};
+
+export const enableServerProtection = async (projectId, serverId, protection) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/enable_protection`, protection);
+  return response.data;
+};
+
+export const disableServerProtection = async (projectId, serverId, protection) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/disable_protection`, protection);
+  return response.data;
+};
+
+export const changeServerRdns = async (projectId, serverId, ip, dnsPtr) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/change_rdns`, { ip, dns_ptr: dnsPtr });
+  return response.data;
+};
+
+export const updateServerLabels = async (projectId, serverId, labels) => {
+  const response = await api.put(`/projects/${projectId}/servers/${serverId}/labels`, { labels });
+  return response.data;
+};
+
+export const createServerImage = async (projectId, serverId, imageData) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/create_image`, imageData);
+  return response.data;
+};
+
+export const requestServerConsole = async (projectId, serverId) => {
+  const response = await api.get(`/projects/${projectId}/servers/${serverId}/request_console`);
+  return response.data;
+};
+
+export const resetServerPassword = async (projectId, serverId) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/reset_password`);
+  return response.data;
+};
