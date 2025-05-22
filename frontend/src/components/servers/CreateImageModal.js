@@ -1,25 +1,18 @@
+// src/components/servers/CreateImageModal.js
 import React, { useState } from 'react';
-import { Modal, Form, Input, Select, Radio, Space, Alert, message } from 'antd';
+import { Modal, Form, Input, Radio, Alert } from 'antd';
 
-const { Option } = Select;
 const { TextArea } = Input;
 
 function CreateImageModal({ visible, onCancel, onSubmit, loading }) {
-  const [form] = Form.useForm();
   const [imageType, setImageType] = useState('snapshot');
+  const [description, setDescription] = useState('');
 
   const handleSubmit = () => {
-    form.validateFields()
-      .then(values => {
-        onSubmit(values);
-      })
-      .catch(info => {
-        console.log('Validate Failed:', info);
-      });
-  };
-
-  const handleTypeChange = e => {
-    setImageType(e.target.value);
+    onSubmit({
+      type: imageType,
+      description: description
+    });
   };
 
   return (
@@ -33,51 +26,41 @@ function CreateImageModal({ visible, onCancel, onSubmit, loading }) {
     >
       <Alert
         message="Note"
-        description="Creating an image allows you to backup your server or create a template for future servers. The server will remain running during this operation."
+        description={
+          <div>
+            <p>Creating an image allows you to backup your server or create a template for future servers. The server will remain running during this operation.</p>
+            <p><strong>Snapshot:</strong> A one-time backup of your server that you can use to restore or create new servers.</p>
+            <p><strong>Backup:</strong> A managed backup that will be part of Hetzner's backup system (may incur additional costs).</p>
+          </div>
+        }
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
       />
       
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{
-          type: 'snapshot',
-          description: '',
-          labels: {}
-        }}
-      >
-        <Form.Item
-          name="type"
-          label="Image Type"
-        >
-          <Radio.Group onChange={handleTypeChange} value={imageType}>
+      <Form layout="vertical">
+        <Form.Item label="Image Type">
+          <Radio.Group 
+            value={imageType}
+            onChange={e => setImageType(e.target.value)}
+          >
             <Radio value="snapshot">Snapshot (One-time backup)</Radio>
             <Radio value="backup">Backup (Managed backup)</Radio>
           </Radio.Group>
         </Form.Item>
         
-        <Form.Item
-          name="description"
+        <Form.Item 
           label="Description"
-          rules={[{ required: true, message: 'Please enter a description for this image' }]}
+          help="Enter a description to identify this image later"
+          required
         >
           <TextArea 
             rows={3} 
-            placeholder="Enter a description to identify this image"
+            placeholder="Enter a description for this image"
+            value={description}
+            onChange={e => setDescription(e.target.value)}
           />
         </Form.Item>
-        
-        {imageType === 'backup' && (
-          <Alert
-            message="Backup Information"
-            description="Backups are managed by Hetzner and can be automatically rotated. They may incur additional costs depending on your plan."
-            type="warning"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-        )}
       </Form>
     </Modal>
   );

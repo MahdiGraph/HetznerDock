@@ -2906,10 +2906,29 @@ def change_server_type(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         server = client.servers.get_by_id(server_id)
-        server_type = client.server_types.get_by_name(type_data.server_type)
+        current_server_type = server.server_type
+        new_server_type = None
         
-        if not server_type:
+        try:
+            new_server_type = client.server_types.get_by_name(type_data.server_type)
+        except:
+            # اگر نتونستیم با نام پیدا کنیم، همه سرور تایپ‌ها رو بررسی می‌کنیم
+            all_types = client.server_types.get_all()
+            for st in all_types:
+                if st.name == type_data.server_type:
+                    new_server_type = st
+                    break
+                    
+        if not new_server_type:
             raise HTTPException(status_code=404, detail=f"Server type '{type_data.server_type}' not found")
+        
+        # بررسی محدودیت دیسک
+        if hasattr(new_server_type, 'disk') and hasattr(current_server_type, 'disk'):
+            if new_server_type.disk < current_server_type.disk:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Cannot change to a server type with smaller disk. Current: {current_server_type.disk}GB, Target: {new_server_type.disk}GB"
+                )
         
         server.change_type(
             server_type=type_data.server_type,
@@ -2940,7 +2959,7 @@ def change_server_type(
             user_id=current_user.id
         )
         raise HTTPException(status_code=500, detail=f"Error changing server type: {str(e)}")
-
+    
 # فعال کردن محافظت سرور
 @router.post("/projects/{project_id}/servers/{server_id}/enable_protection")
 def enable_server_protection(
@@ -3180,7 +3199,7 @@ def request_server_console(
         server = client.servers.get_by_id(server_id)
         response = server.request_console()
         
-        # Log console request
+        # ثبت لاگ موفقیت
         log_action(
             db=db,
             action="SERVER_REQUEST_CONSOLE",
@@ -3190,24 +3209,42 @@ def request_server_console(
             user_id=current_user.id
         )
         
-        return {
+        # ایمن استخراج کردن اطلاعات کنسول
+        console_data = {
             "message": f"Console access granted for server '{server.name}'",
-            "wss_url": response.wss_url,
-            "password": response.password,
-            "expires_at": response.expires.isoformat() if response.expires else None
+            "wss_url": getattr(response, 'wss_url', None),
+            "password": getattr(response, 'password', None),
         }
+        
+        # بررسی ایمن ویژگی expires با نام‌های مختلف احتمالی
+        expires_at = None
+        if hasattr(response, 'expires'):
+            expires_at = response.expires
+        elif hasattr(response, 'expires_at'):
+            expires_at = response.expires_at
+        
+        if expires_at and hasattr(expires_at, 'isoformat'):
+            console_data["expires_at"] = expires_at.isoformat()
+        else:
+            # اگر تاریخ انقضا پیدا نشد، یک ساعت به زمان فعلی اضافه می‌کنیم
+            from datetime import datetime, timedelta
+            console_data["expires_at"] = (datetime.utcnow() + timedelta(hours=1)).isoformat()
+            
+        return console_data
     except Exception as e:
-        # Log error
+        # ثبت خطا با جزئیات بیشتر
+        error_message = f"Error requesting console for server {server_id}: {str(e)}"
         log_action(
             db=db,
             action="SERVER_REQUEST_CONSOLE",
-            details=f"Error requesting console for server {server_id}: {str(e)}",
+            details=error_message,
             status="failed",
             project_id=project.id,
             user_id=current_user.id
         )
-        raise HTTPException(status_code=500, detail=f"Error requesting server console: {str(e)}")
-
+        print(error_message)  # اضافه کردن لاگ در کنسول سرور برای عیب‌یابی
+        raise HTTPException(status_code=500, detail=error_message)
+    
 # بازنشانی پسورد
 @router.post("/projects/{project_id}/servers/{server_id}/reset_password")
 def reset_server_password(

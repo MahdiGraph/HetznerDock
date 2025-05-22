@@ -259,9 +259,14 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(true);
       setConsoleError(null);
       const result = await serverService.requestServerConsole(projectId, serverId);
+      
+      // نمایش اطلاعات وضعیت در کنسول
+      console.log("Console data:", result);
+      
       setConsoleData(result);
       setConsoleModalVisible(true);
     } catch (error) {
+      console.error("Console error:", error);
       setConsoleError(`Failed to request console: ${error.response?.data?.detail || error.message}`);
       setConsoleModalVisible(true);
     } finally {

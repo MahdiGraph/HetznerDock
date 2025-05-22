@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Modal, Button, Alert, Space, Typography, Input, Spin, message } from 'antd';
+// src/components/servers/ConsoleModal.js
+import React from 'react';
+import { Modal, Button, Alert, Typography, Input, Spin, message } from 'antd';
 import { LinkOutlined, CopyOutlined, LoginOutlined } from '@ant-design/icons';
 
 const { Text, Paragraph } = Typography;
@@ -92,13 +93,15 @@ function ConsoleModal({ visible, onCancel, consoleData, loading, error }) {
             </div>
           </Paragraph>
           
-          <Paragraph>
-            <Text strong>Expires:</Text> {new Date(consoleData.expires_at).toLocaleString()}
-          </Paragraph>
+          {consoleData.expires_at && (
+            <Paragraph>
+              <Text strong>Expires:</Text> {new Date(consoleData.expires_at).toLocaleString()}
+            </Paragraph>
+          )}
           
           <Alert
             message="Note"
-            description="The console access is temporary and will expire at the time shown above."
+            description="The console access is temporary and will expire. If you need access later, request a new console session."
             type="info"
             showIcon
           />

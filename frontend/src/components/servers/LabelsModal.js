@@ -1,9 +1,9 @@
+// src/components/servers/LabelsModal.js
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Button, Space, Divider, Tag } from 'antd';
 import { PlusOutlined, TagOutlined } from '@ant-design/icons';
 
 function LabelsModal({ visible, onCancel, onSubmit, loading, initialLabels = {} }) {
-  const [form] = Form.useForm();
   const [labels, setLabels] = useState({});
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
@@ -16,10 +16,11 @@ function LabelsModal({ visible, onCancel, onSubmit, loading, initialLabels = {} 
 
   const handleAddLabel = () => {
     if (newKey && newValue) {
-      setLabels({
+      const updatedLabels = {
         ...labels,
         [newKey]: newValue
-      });
+      };
+      setLabels(updatedLabels);
       setNewKey('');
       setNewValue('');
     }
@@ -68,18 +69,18 @@ function LabelsModal({ visible, onCancel, onSubmit, loading, initialLabels = {} 
       
       <Divider orientation="left">Add New Label</Divider>
       
-      <Space style={{ marginBottom: 16 }} align="baseline">
+      <div style={{ display: 'flex', marginBottom: 16 }}>
         <Input
           placeholder="Key"
           value={newKey}
           onChange={e => setNewKey(e.target.value)}
-          style={{ width: 120 }}
+          style={{ width: 120, marginRight: 8 }}
         />
         <Input
           placeholder="Value"
           value={newValue}
           onChange={e => setNewValue(e.target.value)}
-          style={{ width: 200 }}
+          style={{ width: 200, marginRight: 8 }}
         />
         <Button 
           icon={<PlusOutlined />} 
@@ -88,7 +89,7 @@ function LabelsModal({ visible, onCancel, onSubmit, loading, initialLabels = {} 
         >
           Add
         </Button>
-      </Space>
+      </div>
     </Modal>
   );
 }

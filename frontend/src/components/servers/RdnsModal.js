@@ -1,18 +1,14 @@
+// src/components/servers/RdnsModal.js
 import React, { useState } from 'react';
-import { Modal, Form, Input, Alert, message } from 'antd';
+import { Modal, Form, Input, Alert } from 'antd';
 import { GlobalOutlined } from '@ant-design/icons';
 
 function RdnsModal({ visible, onCancel, onSubmit, loading, serverIP }) {
-  const [form] = Form.useForm();
+  const [ip, setIp] = useState(serverIP || '');
+  const [dnsPtr, setDnsPtr] = useState('');
 
   const handleSubmit = () => {
-    form.validateFields()
-      .then(values => {
-        onSubmit(values.ip, values.dns_ptr);
-      })
-      .catch(info => {
-        console.log('Validate Failed:', info);
-      });
+    onSubmit(ip, dnsPtr);
   };
 
   return (
@@ -26,50 +22,40 @@ function RdnsModal({ visible, onCancel, onSubmit, loading, serverIP }) {
     >
       <Alert
         message="Reverse DNS Information"
-        description="Reverse DNS (PTR) records are used to map an IP address to a hostname. This is useful for services like mail servers to verify the identity of the server."
+        description={
+          <div>
+            <p>Reverse DNS (PTR) records are used to map an IP address to a hostname. This is useful for services like mail servers to verify the identity of the server.</p>
+            <p><strong>Example:</strong> If you want emails from your server to be less likely marked as spam, set up a reverse DNS record that matches your mail server's hostname.</p>
+          </div>
+        }
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
       />
       
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{
-          ip: serverIP || '',
-          dns_ptr: ''
-        }}
-      >
+      <Form layout="vertical">
         <Form.Item
-          name="ip"
           label="IP Address"
-          rules={[
-            { required: true, message: 'Please enter an IP address' },
-            { 
-              pattern: /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/, 
-              message: 'Please enter a valid IPv4 address' 
-            }
-          ]}
+          required
+          help="This is your server's IP address"
         >
           <Input 
             prefix={<GlobalOutlined />}
+            value={ip}
+            onChange={e => setIp(e.target.value)}
             placeholder="192.168.1.1"
             disabled={!!serverIP}
           />
         </Form.Item>
         
         <Form.Item
-          name="dns_ptr"
           label="Reverse DNS Entry"
-          rules={[
-            { required: true, message: 'Please enter a hostname' },
-            { 
-              pattern: /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/, 
-              message: 'Please enter a valid hostname (e.g., server.example.com)' 
-            }
-          ]}
+          required
+          help="Enter the hostname that should be associated with this IP"
         >
           <Input 
+            value={dnsPtr}
+            onChange={e => setDnsPtr(e.target.value)}
             placeholder="server.example.com"
           />
         </Form.Item>
