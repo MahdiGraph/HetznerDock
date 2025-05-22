@@ -44,3 +44,49 @@ export const getServerTypes = async (projectId) => {
   const response = await api.get(`/projects/${projectId}/server_types`);
   return response.data;
 };
+
+// اضافه شده - قابلیت‌های جدید
+export const rebuildServer = async (projectId, serverId, imageData) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/rebuild`, imageData);
+  return response.data;
+};
+
+export const enableRescueMode = async (projectId, serverId, rescueData = {}) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/enable_rescue`, rescueData);
+  return response.data;
+};
+
+export const disableRescueMode = async (projectId, serverId) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/disable_rescue`);
+  return response.data;
+};
+
+export const attachISO = async (projectId, serverId, isoData) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/attach_iso`, isoData);
+  return response.data;
+};
+
+export const detachISO = async (projectId, serverId) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/detach_iso`);
+  return response.data;
+};
+
+export const resetServer = async (projectId, serverId) => {
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/reset`);
+  return response.data;
+};
+
+export const getISOs = async (projectId) => {
+  const response = await api.get(`/projects/${projectId}/isos`);
+  return response.data;
+};
+
+export const getPricing = async (projectId) => {
+  const response = await api.get(`/projects/${projectId}/pricing`);
+  return response.data;
+};
+
+export const getActions = async (projectId, params = {}) => {
+  const response = await api.get(`/projects/${projectId}/actions`, { params });
+  return response.data;
+};

@@ -1,29 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Descriptions, Button, Card, Space, message, Statistic, Row, Col, Tag
+import {
+  Descriptions, Button, Card, Space, message, Statistic, Row, Col, Tag, Menu, Dropdown
 } from 'antd';
-import { 
-  PoweroffOutlined, PlayCircleOutlined, RedoOutlined, 
+import {
+  PoweroffOutlined, PlayCircleOutlined, RedoOutlined,
   LoadingOutlined, ArrowUpOutlined, ClockCircleOutlined,
-  HddOutlined
+  HddOutlined, ReloadOutlined, DownOutlined,
+  SafetyOutlined, UndoOutlined, SaveOutlined
 } from '@ant-design/icons';
 import * as serverService from '../../api/services/serverService';
 import moment from 'moment';
+import RebuildServerModal from './RebuildServerModal';
+import RescueModeModal from './RescueModeModal';
+import AttachISOModal from './AttachISOModal';
 
 function ServerDetailPanel({ projectId, serverId }) {
   const [server, setServer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   
+  // State for advanced actions modals
+  const [rebuildModalVisible, setRebuildModalVisible] = useState(false);
+  const [rescueModalVisible, setRescueModalVisible] = useState(false);
+  const [isoModalVisible, setISOModalVisible] = useState(false);
+  const [rootPassword, setRootPassword] = useState(null);
+
   useEffect(() => {
     fetchServerDetails();
-    
     // Set up polling for status updates
     const intervalId = setInterval(fetchServerDetails, 5000);
-    
     return () => clearInterval(intervalId);
   }, [projectId, serverId]);
-  
+
   const fetchServerDetails = async () => {
     try {
       setLoading(true);
@@ -35,11 +43,10 @@ function ServerDetailPanel({ projectId, serverId }) {
       setLoading(false);
     }
   };
-  
+
   const handleServerAction = async (action, actionName) => {
     try {
       setActionLoading(true);
-      
       let result;
       switch (action) {
         case 'power_on':
@@ -51,10 +58,12 @@ function ServerDetailPanel({ projectId, serverId }) {
         case 'reboot':
           result = await serverService.rebootServer(projectId, serverId);
           break;
+        case 'reset':
+          result = await serverService.resetServer(projectId, serverId);
+          break;
         default:
           return;
       }
-      
       message.success(`Server ${actionName} initiated successfully`);
       fetchServerDetails();
     } catch (error) {
@@ -63,7 +72,81 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
+  const handleRebuildServer = async (image) => {
+    try {
+      setActionLoading(true);
+      const result = await serverService.rebuildServer(projectId, serverId, { image });
+      message.success('Server rebuild initiated successfully');
+      if (result.root_password) {
+        setRootPassword(result.root_password);
+      }
+      setRebuildModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to rebuild server: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEnableRescue = async (values) => {
+    try {
+      setActionLoading(true);
+      const result = await serverService.enableRescueMode(projectId, serverId, values);
+      message.success('Rescue mode enabled successfully');
+      if (result.root_password) {
+        setRootPassword(result.root_password);
+      }
+      setRescueModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to enable rescue mode: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDisableRescue = async () => {
+    try {
+      setActionLoading(true);
+      await serverService.disableRescueMode(projectId, serverId);
+      message.success('Rescue mode disabled successfully');
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to disable rescue mode: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAttachISO = async (iso) => {
+    try {
+      setActionLoading(true);
+      await serverService.attachISO(projectId, serverId, { iso });
+      message.success('ISO attached successfully');
+      setISOModalVisible(false);
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to attach ISO: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDetachISO = async () => {
+    try {
+      setActionLoading(true);
+      await serverService.detachISO(projectId, serverId);
+      message.success('ISO detached successfully');
+      fetchServerDetails();
+    } catch (error) {
+      message.error(`Failed to detach ISO: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading && !server) {
     return (
       <Card loading={true}>
@@ -71,7 +154,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       </Card>
     );
   }
-  
+
   if (!server) {
     return (
       <Card>
@@ -79,7 +162,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       </Card>
     );
   }
-  
+
   // Get status color
   const getStatusColor = (status) => {
     switch (status) {
@@ -94,7 +177,7 @@ function ServerDetailPanel({ projectId, serverId }) {
         return 'default';
     }
   };
-  
+
   // Status icon
   const getStatusIcon = (status) => {
     switch (status) {
@@ -109,9 +192,62 @@ function ServerDetailPanel({ projectId, serverId }) {
         return <ClockCircleOutlined />;
     }
   };
-  
+
+  const actionsMenu = (
+    <Menu>
+      <Menu.Item key="rebuild" onClick={() => setRebuildModalVisible(true)}>
+        <ReloadOutlined /> Rebuild Server
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="rescue_enable" onClick={() => setRescueModalVisible(true)}>
+        <SafetyOutlined /> Enable Rescue Mode
+      </Menu.Item>
+      <Menu.Item key="rescue_disable" onClick={handleDisableRescue}>
+        <SafetyOutlined /> Disable Rescue Mode
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="iso_attach" onClick={() => setISOModalVisible(true)}>
+        <SaveOutlined /> Attach ISO
+      </Menu.Item>
+      <Menu.Item key="iso_detach" onClick={handleDetachISO}>
+        <SaveOutlined /> Detach ISO
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="reset" onClick={() => handleServerAction('reset', 'Reset')}>
+        <UndoOutlined /> Hard Reset
+      </Menu.Item>
+    </Menu>
+  );
+
   return (
     <div>
+      {rootPassword && (
+        <Card style={{ marginBottom: 16, borderColor: '#faad14' }}>
+          <Space direction="vertical">
+            <h3 style={{ color: '#faad14' }}>Root Password</h3>
+            <p>This is shown only once. Please save it now.</p>
+            <Tag color="orange" style={{ padding: '4px 8px', fontSize: '14px' }}>
+              {rootPassword}
+            </Tag>
+            <Button 
+              type="primary" 
+              onClick={() => {
+                navigator.clipboard.writeText(rootPassword);
+                message.success('Password copied to clipboard');
+              }}
+            >
+              Copy to Clipboard
+            </Button>
+            <Button 
+              type="link" 
+              onClick={() => setRootPassword(null)}
+            >
+              Dismiss
+            </Button>
+          </Space>
+        </Card>
+      )}
+
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8}>
           <Card>
@@ -123,7 +259,6 @@ function ServerDetailPanel({ projectId, serverId }) {
             />
           </Card>
         </Col>
-        
         <Col xs={24} sm={8}>
           <Card>
             <Statistic
@@ -133,7 +268,6 @@ function ServerDetailPanel({ projectId, serverId }) {
             />
           </Card>
         </Col>
-        
         <Col xs={24} sm={8}>
           <Card>
             <Statistic
@@ -144,9 +278,8 @@ function ServerDetailPanel({ projectId, serverId }) {
           </Card>
         </Col>
       </Row>
-      
-      <Card 
-        title="Server Details" 
+      <Card
+        title="Server Details"
         style={{ marginTop: 16 }}
         extra={
           <Space>
@@ -159,7 +292,6 @@ function ServerDetailPanel({ projectId, serverId }) {
             >
               Power On
             </Button>
-            
             <Button
               danger
               icon={<PoweroffOutlined />}
@@ -169,7 +301,6 @@ function ServerDetailPanel({ projectId, serverId }) {
             >
               Power Off
             </Button>
-            
             <Button
               icon={<RedoOutlined />}
               disabled={server.status !== 'running' || actionLoading}
@@ -178,6 +309,12 @@ function ServerDetailPanel({ projectId, serverId }) {
             >
               Reboot
             </Button>
+            
+            <Dropdown overlay={actionsMenu} disabled={actionLoading}>
+              <Button>
+                More Actions <DownOutlined />
+              </Button>
+            </Dropdown>
           </Space>
         }
       >
@@ -196,6 +333,28 @@ function ServerDetailPanel({ projectId, serverId }) {
           </Descriptions.Item>
         </Descriptions>
       </Card>
+
+      <RebuildServerModal
+        visible={rebuildModalVisible}
+        onCancel={() => setRebuildModalVisible(false)}
+        onSubmit={handleRebuildServer}
+        projectId={projectId}
+      />
+
+      <RescueModeModal
+        visible={rescueModalVisible}
+        onCancel={() => setRescueModalVisible(false)}
+        onSubmit={handleEnableRescue}
+        projectId={projectId}
+        serverId={serverId}
+      />
+
+      <AttachISOModal
+        visible={isoModalVisible}
+        onCancel={() => setISOModalVisible(false)}
+        onSubmit={handleAttachISO}
+        projectId={projectId}
+      />
     </div>
   );
 }
