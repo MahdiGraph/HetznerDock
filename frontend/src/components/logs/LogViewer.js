@@ -32,7 +32,7 @@ function LogViewer({ projectId }) {
         limit: pagination.pageSize
       };
       
-      // Add date filtering if applicable
+      // Add date filtering if applicable - with proper ISO date format
       if (dateRange && dateRange[0] && dateRange[1]) {
         params.start_date = dateRange[0].format('YYYY-MM-DD');
         params.end_date = dateRange[1].format('YYYY-MM-DD');

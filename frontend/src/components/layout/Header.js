@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Button, Dropdown, Typography, Space } from 'antd';
+import { Layout, Button, Dropdown, Typography, Space, Menu } from 'antd';
 import { 
   MenuUnfoldOutlined, 
   MenuFoldOutlined, 
@@ -18,16 +18,17 @@ function Header({ collapsed, setCollapsed, showChangePassword }) {
   const { user, logout } = useAuth();
   const { projects, currentProject, selectProject } = useProjects();
   
+  // Fixed: proper menu structure for Ant Design Dropdown
   const userMenu = (
-    <Dropdown.Menu>
-      <Dropdown.Item key="password" onClick={showChangePassword} icon={<LockOutlined />}>
+    <Menu>
+      <Menu.Item key="password" onClick={showChangePassword} icon={<LockOutlined />}>
         Change Password
-      </Dropdown.Item>
-      <Dropdown.Divider />
-      <Dropdown.Item key="logout" onClick={logout} icon={<LogoutOutlined />}>
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="logout" onClick={logout} icon={<LogoutOutlined />}>
         Logout
-      </Dropdown.Item>
-    </Dropdown.Menu>
+      </Menu.Item>
+    </Menu>
   );
   
   return (

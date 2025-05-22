@@ -10,7 +10,7 @@ def log_action(
     status: str, 
     project_id: Optional[int],
     user_id: int
-):
+) -> models.Log:
     """
     Store logs with FIFO mechanism - when count exceeds limit, oldest logs are deleted
     """
@@ -24,27 +24,8 @@ def log_action(
         user_id=user_id
     )
     
-    # If project_id exists, check if log count exceeds limit
+    # If project_id exists, check if log count exceeds limit and clean up old logs
     if project_id:
-        # Count logs for this project
-        log_count = crud.count_logs(db, project_id)
-        
-        # If exceeds limit, delete oldest logs (FIFO)
-        if log_count > settings.LOG_MAX_ENTRIES:
-            # Number of logs to delete
-            excess = log_count - settings.LOG_MAX_ENTRIES
-            
-            # Find oldest logs
-            oldest_logs = db.query(models.Log)\
-                .filter(models.Log.project_id == project_id)\
-                .order_by(models.Log.created_at)\
-                .limit(excess)\
-                .all()
-            
-            # Delete old logs
-            for log in oldest_logs:
-                db.delete(log)
-            
-            db.commit()
+        crud.delete_old_logs(db, project_id, settings.LOG_MAX_ENTRIES)
     
     return db_log

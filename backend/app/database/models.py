@@ -13,7 +13,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    projects = relationship("Project", back_populates="owner")
+    projects = relationship("Project", back_populates="owner", cascade="all, delete-orphan")
 
 class Project(Base):
     __tablename__ = "projects"
@@ -26,7 +26,7 @@ class Project(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     
     owner = relationship("User", back_populates="projects")
-    logs = relationship("Log", back_populates="project")
+    logs = relationship("Log", back_populates="project", cascade="all, delete-orphan")
 
 class Log(Base):
     __tablename__ = "logs"
@@ -34,7 +34,7 @@ class Log(Base):
     id = Column(Integer, primary_key=True, index=True)
     action = Column(String)
     details = Column(Text, nullable=True)
-    status = Column(String)  # success, failed, etc.
+    status = Column(String)  # success, failed, pending
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"))

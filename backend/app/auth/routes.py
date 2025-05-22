@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from sqlalchemy.orm import Session
@@ -9,8 +9,14 @@ from .password import get_password_hash, verify_password
 from ..config import settings
 from ..logging.logger import log_action
 from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
 
 router = APIRouter()
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 class UserCreate(BaseModel):
     username: str
@@ -21,7 +27,16 @@ class ChangePassword(BaseModel):
     old_password: str
     new_password: str
 
-@router.post("/token")
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    is_active: bool
+
+    class Config:
+        orm_mode = True  # Important: This allows direct mapping from ORM objects
+
+@router.post("/token", response_model=Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -62,6 +77,16 @@ async def login_for_access_token(
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/me", response_model=UserResponse)
+async def read_users_me(current_user: models.User = Depends(get_current_user)):
+    """Get information about the current authenticated user"""
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "is_active": current_user.is_active
+    }
 
 @router.post("/change-password")
 async def change_password(
@@ -104,10 +129,8 @@ async def change_password(
     
     return {"message": "Password updated successfully"}
 
-# Setup initial admin user if not exists
-@router.on_event("startup")
-async def startup_db_client():
-    db = next(get_db())
+def setup_admin_user(db: Session):
+    """Setup initial admin user if not exists"""
     # Check if admin user exists
     admin = crud.get_user_by_username(db, settings.ADMIN_USERNAME)
     if not admin:
