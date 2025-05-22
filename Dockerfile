@@ -1,45 +1,35 @@
-# Stage 1: Build Frontend
-FROM node:18-alpine as frontend-builder
-WORKDIR /app/frontend
-
-# Copy package.json first for better cache utilization
-COPY frontend/package.json ./
-RUN npm install
-
-# Copy frontend source code
-COPY frontend/public ./public
-COPY frontend/src ./src
-
-# Build the frontend
-RUN npm run build
-
-# Stage 2: Build Backend
 FROM python:3.10-slim
 
-WORKDIR /app
+# Set working directory to match your local setup
+WORKDIR /app/backend
 
-# Install dependencies first (for better caching)
+# Copy requirements first for better caching
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
 # Copy backend code
-COPY backend/ /app/backend/
+COPY backend/ .
 
-# Copy built frontend from the first stage
-COPY --from=frontend-builder /app/frontend/build /app/frontend/build
+# Copy frontend build
+COPY frontend/build/ /app/frontend/build/
 
 # Create data directory
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod 777 /app/data
+
+# Create startup script that matches your working solution
+RUN echo '#!/bin/bash\n\
+cd /app/backend\n\
+echo "Starting HetznerDock..."\n\
+echo "Admin user: $ADMIN_USERNAME"\n\
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000\n' > /app/start.sh
+
+RUN chmod +x /app/start.sh
 
 # Set environment variables
-ENV PYTHONPATH=/app
-ENV DATABASE_URL=sqlite:///./data/app.db
-
-# Create volume for persistent data
-VOLUME /app/data
+ENV DATABASE_URL=sqlite:///../../data/app.db
 
 # Expose the port
 EXPOSE 8000
 
-# Fix the command to properly run the app
-CMD ["python", "/app/backend/app/main.py"]
+# Run the application
+CMD ["/app/start.sh"]

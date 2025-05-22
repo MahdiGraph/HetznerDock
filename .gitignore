@@ -19,9 +19,6 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Frontend build
-/frontend/build/
-
 # Environment variables
 .env
 .env.local

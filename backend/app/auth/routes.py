@@ -7,7 +7,7 @@ from ..database.database import get_db
 from .jwt import create_access_token, get_current_user
 from .password import get_password_hash, verify_password
 from ..config import settings
-from ..logging.logger import log_action
+from ..app_logger.logger import log_action
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime

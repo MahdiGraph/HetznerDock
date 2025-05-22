@@ -8,7 +8,7 @@ from datetime import datetime
 from ..database import crud, models
 from ..database.database import get_db
 from ..auth.jwt import get_current_user
-from ..logging.logger import log_action
+from ..app_logger.logger import log_action
 
 router = APIRouter()
 
