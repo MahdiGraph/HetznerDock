@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   Form, Input, Select, Button, Card, Alert, message, Spin, Modal
 } from 'antd';
 import * as serverService from '../../api/services/serverService';
+import * as sshKeyService from '../../api/services/sshKeyService';
 
 const { Option } = Select;
 
@@ -13,24 +14,26 @@ function ServerForm({ projectId, onSuccess }) {
   const [error, setError] = useState('');
   const [images, setImages] = useState([]);
   const [serverTypes, setServerTypes] = useState([]);
-  
+  const [sshKeys, setSSHKeys] = useState([]); 
+
   useEffect(() => {
     if (projectId) {
       fetchOptions();
     }
   }, [projectId]);
-  
+
   const fetchOptions = async () => {
     setLoading(true);
     try {
-      // Fetch images and server types in parallel
-      const [imagesResponse, serverTypesResponse] = await Promise.all([
+      // Fetch images, server types, and SSH keys in parallel
+      const [imagesResponse, serverTypesResponse, sshKeysResponse] = await Promise.all([
         serverService.getImages(projectId),
-        serverService.getServerTypes(projectId)
+        serverService.getServerTypes(projectId),
+        sshKeyService.getSSHKeys(projectId)
       ]);
-      
       setImages(imagesResponse.images || []);
       setServerTypes(serverTypesResponse.server_types || []);
+      setSSHKeys(sshKeysResponse.ssh_keys || []);
     } catch (error) {
       setError('Failed to load required options. Please try again.');
       message.error('Failed to load server options');
@@ -38,21 +41,19 @@ function ServerForm({ projectId, onSuccess }) {
       setLoading(false);
     }
   };
-  
+
   const handleSubmit = async (values) => {
     setSubmitting(true);
     setError('');
-    
     try {
       const response = await serverService.createServer(projectId, {
         name: values.name,
         server_type: values.server_type,
         image: values.image,
-        location: values.location
+        location: values.location,
+        ssh_keys: values.ssh_keys
       });
-      
       message.success('Server created successfully');
-      
       // Display a special message with root password if available
       if (response.root_password) {
         Modal.success({
@@ -71,7 +72,6 @@ function ServerForm({ projectId, onSuccess }) {
           ),
         });
       }
-      
       form.resetFields();
       if (onSuccess) {
         onSuccess(response);
@@ -82,7 +82,7 @@ function ServerForm({ projectId, onSuccess }) {
       setSubmitting(false);
     }
   };
-  
+
   if (loading) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -91,16 +91,15 @@ function ServerForm({ projectId, onSuccess }) {
       </div>
     );
   }
-  
+
   // Filter out non-distribution images (apps, snapshots, backups)
-  const distributionImages = images.filter(image => 
+  const distributionImages = images.filter(image =>
     image.type === 'system' && image.os_flavor
   );
-  
+
   return (
     <Card title="Create New Server">
       {error && <Alert message={error} type="error" style={{ marginBottom: 16 }} />}
-      
       <Form
         form={form}
         layout="vertical"
@@ -116,13 +115,12 @@ function ServerForm({ projectId, onSuccess }) {
         >
           <Input placeholder="my-server" />
         </Form.Item>
-        
         <Form.Item
           name="server_type"
           label="Server Type"
           rules={[{ required: true, message: 'Please select a server type!' }]}
         >
-          <Select 
+          <Select
             placeholder="Select server type"
             showSearch
             optionFilterProp="children"
@@ -134,13 +132,12 @@ function ServerForm({ projectId, onSuccess }) {
             ))}
           </Select>
         </Form.Item>
-        
         <Form.Item
           name="image"
           label="Operating System"
           rules={[{ required: true, message: 'Please select an operating system!' }]}
         >
-          <Select 
+          <Select
             placeholder="Select operating system"
             showSearch
             optionFilterProp="children"
@@ -152,7 +149,6 @@ function ServerForm({ projectId, onSuccess }) {
             ))}
           </Select>
         </Form.Item>
-        
         <Form.Item
           name="location"
           label="Location"
@@ -162,6 +158,25 @@ function ServerForm({ projectId, onSuccess }) {
             <Option value="fsn1">Falkenstein, Germany</Option>
             <Option value="hel1">Helsinki, Finland</Option>
             <Option value="ash">Ashburn, VA, USA</Option>
+          </Select>
+        </Form.Item>
+        
+        {/* اضافه کردن فیلد SSH key به فرم */}
+        <Form.Item
+          name="ssh_keys"
+          label="SSH Keys"
+          help="Select SSH keys to add to this server for secure access"
+        >
+          <Select
+            mode="multiple"
+            placeholder="Select SSH keys (optional)"
+            optionFilterProp="children"
+          >
+            {sshKeys.map(key => (
+              <Option key={key.id} value={key.id}>
+                {key.name}
+              </Option>
+            ))}
           </Select>
         </Form.Item>
         

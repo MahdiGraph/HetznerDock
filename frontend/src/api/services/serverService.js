@@ -144,3 +144,8 @@ export const resetServerPassword = async (projectId, serverId) => {
   const response = await api.post(`/projects/${projectId}/servers/${serverId}/reset_password`);
   return response.data;
 };
+
+export const deleteImage = async (projectId, imageId) => {
+  const response = await api.delete(`/projects/${projectId}/images/${imageId}`);
+  return response.data;
+};

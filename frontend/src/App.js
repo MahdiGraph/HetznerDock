@@ -13,6 +13,7 @@ import CreateServer from './pages/CreateServer';
 import Images from './pages/Images';
 import ServerTypes from './pages/ServerTypes';
 import Logs from './pages/Logs';
+import Snapshots from './pages/Snapshots';
 // New Pages
 import SSHKeys from './pages/SSHKeys';
 import FloatingIPs from './pages/FloatingIPs';
@@ -56,6 +57,7 @@ function App() {
         <Route path="/projects/:projectId/networks" element={<Networks />} />
         <Route path="/projects/:projectId/system-logs" element={<SystemLogs />} />
         <Route path="/projects/:projectId/pricing" element={<Pricing />} />
+        <Route path="/projects/:projectId/snapshots" element={<Snapshots />} />
         
         {/* Global Logs */}
         <Route path="/logs" element={<Logs />} />

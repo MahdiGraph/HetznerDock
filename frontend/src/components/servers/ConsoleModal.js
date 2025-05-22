@@ -2,16 +2,14 @@
 import React from 'react';
 import { Modal, Button, Alert, Typography, Input, Spin, message } from 'antd';
 import { LinkOutlined, CopyOutlined, LoginOutlined } from '@ant-design/icons';
-
 const { Text, Paragraph } = Typography;
 
-function ConsoleModal({ visible, onCancel, consoleData, loading, error }) {
-  
+function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     message.success('Copied to clipboard');
   };
-  
+
   const openConsole = () => {
     if (consoleData?.wss_url) {
       window.open(consoleData.wss_url, '_blank');
@@ -21,7 +19,7 @@ function ConsoleModal({ visible, onCancel, consoleData, loading, error }) {
   return (
     <Modal
       title="VNC Console Access"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       footer={[
         <Button key="close" onClick={onCancel}>
@@ -56,11 +54,10 @@ function ConsoleModal({ visible, onCancel, consoleData, loading, error }) {
             showIcon
             style={{ marginBottom: 16 }}
           />
-          
           <Paragraph>
             <Text strong>Console URL:</Text>
             <div style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
-              <Input 
+              <Input
                 value={consoleData.wss_url}
                 readOnly
                 addonAfter={
@@ -74,11 +71,10 @@ function ConsoleModal({ visible, onCancel, consoleData, loading, error }) {
               />
             </div>
           </Paragraph>
-          
           <Paragraph>
             <Text strong>Password:</Text>
             <div style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
-              <Input 
+              <Input
                 value={consoleData.password}
                 readOnly
                 addonAfter={
@@ -92,13 +88,11 @@ function ConsoleModal({ visible, onCancel, consoleData, loading, error }) {
               />
             </div>
           </Paragraph>
-          
           {consoleData.expires_at && (
             <Paragraph>
               <Text strong>Expires:</Text> {new Date(consoleData.expires_at).toLocaleString()}
             </Paragraph>
           )}
-          
           <Alert
             message="Note"
             description="The console access is temporary and will expire. If you need access later, request a new console session."

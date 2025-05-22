@@ -13,7 +13,8 @@ import {
   GlobalOutlined,
   SafetyOutlined,
   NodeIndexOutlined,
-  DollarOutlined
+  DollarOutlined,
+  CameraOutlined
 } from '@ant-design/icons';
 import { useProjects } from '../../context/ProjectContext';
 
@@ -67,6 +68,9 @@ function Sidebar({ collapsed, location }) {
               </Menu.Item>
               <Menu.Item key={`/projects/${currentProject.id}/server-types`} icon={<SettingOutlined />}>
                 <Link to={`/projects/${currentProject.id}/server-types`}>Server Types</Link>
+              </Menu.Item>
+              <Menu.Item key={`/projects/${currentProject.id}/snapshots`} icon={<CameraOutlined />}>
+                <Link to={`/projects/${currentProject.id}/snapshots`}>Snapshots</Link>
               </Menu.Item>
             </SubMenu>
             

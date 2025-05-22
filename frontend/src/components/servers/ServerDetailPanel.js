@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Descriptions, Button, Card, Space, message, Statistic, Row, Col, Tag, Menu, Dropdown, Modal, Form, Input
+  Descriptions, Button, Card, Space, message, Statistic, Row, Col, Tag, Dropdown, Modal, Form, Input
 } from 'antd';
 import {
   PoweroffOutlined, PlayCircleOutlined, RedoOutlined,
@@ -154,14 +154,13 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleChangePassword = async (password) => {
     try {
       setActionLoading(true);
       const result = await serverService.changeServerPassword(projectId, serverId, password);
       message.success('Password changed successfully');
       setPasswordModalVisible(false);
-      
       // اگر پسورد جدید در پاسخ باشد، آن را نمایش می‌دهیم
       if (result.root_password) {
         setRootPassword(result.root_password);
@@ -172,7 +171,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleChangeType = async (serverType, upgradeDisk) => {
     try {
       setActionLoading(true);
@@ -186,11 +185,10 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleProtection = async (protection) => {
     try {
       setActionLoading(true);
-      
       if (enableProtection) {
         await serverService.enableServerProtection(projectId, serverId, protection);
         message.success('Server protection enabled successfully');
@@ -198,7 +196,6 @@ function ServerDetailPanel({ projectId, serverId }) {
         await serverService.disableServerProtection(projectId, serverId, protection);
         message.success('Server protection disabled successfully');
       }
-      
       setProtectionModalVisible(false);
       fetchServerDetails();
     } catch (error) {
@@ -207,7 +204,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleChangeRdns = async (ip, dnsPtr) => {
     try {
       setActionLoading(true);
@@ -221,7 +218,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleUpdateLabels = async (labels) => {
     try {
       setActionLoading(true);
@@ -235,14 +232,13 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleCreateImage = async (imageData) => {
     try {
       setActionLoading(true);
       const result = await serverService.createServerImage(projectId, serverId, imageData);
       message.success(`Image created successfully: ${result.image.description}`);
       setCreateImageModalVisible(false);
-      
       // اگر پسورد نیاز باشد
       if (result.root_password) {
         setRootPassword(result.root_password);
@@ -253,16 +249,14 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleRequestConsole = async () => {
     try {
       setActionLoading(true);
       setConsoleError(null);
       const result = await serverService.requestServerConsole(projectId, serverId);
-      
-      // نمایش اطلاعات وضعیت در کنسول
+      // نمایش اطلاعات وضعیت در کنسول برای عیب‌یابی
       console.log("Console data:", result);
-      
       setConsoleData(result);
       setConsoleModalVisible(true);
     } catch (error) {
@@ -273,7 +267,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(false);
     }
   };
-  
+
   const handleResetPassword = async () => {
     Modal.confirm({
       title: 'Reset Server Password',
@@ -286,7 +280,6 @@ function ServerDetailPanel({ projectId, serverId }) {
           setActionLoading(true);
           const result = await serverService.resetServerPassword(projectId, serverId);
           message.success('Password reset successfully');
-          
           if (result.root_password) {
             setRootPassword(result.root_password);
           }
@@ -298,7 +291,6 @@ function ServerDetailPanel({ projectId, serverId }) {
       }
     });
   };
-
 
   const handleAttachISO = async (iso) => {
     try {
@@ -373,90 +365,126 @@ function ServerDetailPanel({ projectId, serverId }) {
     }
   };
 
-  const actionsMenu = (
-    <Menu>
-      <Menu.Item key="rename" onClick={() => {
+  // تعریف آیتم‌های منوی More Actions با ساختار جدید
+  const actionsMenuItems = [
+    {
+      key: 'rename',
+      icon: <EditOutlined />,
+      label: 'Rename Server',
+      onClick: () => {
         setServerNewName(server.name);
         setRenameModalVisible(true);
-      }}>
-        <EditOutlined /> Rename Server
-      </Menu.Item>
-      
-      <Menu.Item key="change_password" onClick={() => setPasswordModalVisible(true)}>
-        <KeyOutlined /> Change Password
-      </Menu.Item>
-      
-      <Menu.Item key="change_type" onClick={() => setChangeTypeModalVisible(true)}>
-        <RiseOutlined /> Change Server Type
-      </Menu.Item>
-      
-      <Menu.Divider />
-      
-      <Menu.Item key="enable_protection" onClick={() => {
+      }
+    },
+    {
+      key: 'change_password',
+      icon: <KeyOutlined />,
+      label: 'Change Password',
+      onClick: () => setPasswordModalVisible(true)
+    },
+    {
+      key: 'change_type',
+      icon: <RiseOutlined />,
+      label: 'Change Server Type',
+      onClick: () => setChangeTypeModalVisible(true)
+    },
+    {
+      type: 'divider'
+    },
+    {
+      key: 'enable_protection',
+      icon: <SafetyOutlined />,
+      label: 'Enable Protection',
+      onClick: () => {
         setEnableProtection(true);
         setProtectionModalVisible(true);
-      }}>
-        <SafetyOutlined /> Enable Protection
-      </Menu.Item>
-      
-      <Menu.Item key="disable_protection" onClick={() => {
+      }
+    },
+    {
+      key: 'disable_protection',
+      icon: <SafetyOutlined />,
+      label: 'Disable Protection',
+      onClick: () => {
         setEnableProtection(false);
         setProtectionModalVisible(true);
-      }}>
-        <SafetyOutlined /> Disable Protection
-      </Menu.Item>
-      
-      <Menu.Divider />
-      
-      <Menu.Item key="rdns" onClick={() => setRdnsModalVisible(true)}>
-        <GlobalOutlined /> Manage Reverse DNS
-      </Menu.Item>
-      
-      <Menu.Item key="labels" onClick={() => setLabelsModalVisible(true)}>
-        <TagOutlined /> Manage Labels
-      </Menu.Item>
-      
-      <Menu.Divider />
-      
-      <Menu.Item key="create_image" onClick={() => setCreateImageModalVisible(true)}>
-        <CameraOutlined /> Create Image/Snapshot
-      </Menu.Item>
-      
-      <Menu.Item key="request_console" onClick={handleRequestConsole}>
-        <DesktopOutlined /> Access Console
-      </Menu.Item>
-      
-      <Menu.Item key="reset_password" onClick={handleResetPassword}>
-        <KeyOutlined /> Reset Password
-      </Menu.Item>
-      
-      <Menu.Divider />
-      
-      <Menu.Item key="rebuild" onClick={() => setRebuildModalVisible(true)}>
-        <ReloadOutlined /> Rebuild Server
-      </Menu.Item>
-      
-      <Menu.Item key="reset" onClick={() => handleServerAction('reset', 'Reset')}>
-        <UndoOutlined /> Hard Reset
-      </Menu.Item>
-      
-      <Menu.Item key="rescue_mode" onClick={() => setRescueModalVisible(true)}>
-        <SafetyOutlined /> Enable Rescue Mode
-      </Menu.Item>
-      
-      <Menu.Item key="disable_rescue" onClick={handleDisableRescue}>
-        <SafetyOutlined /> Disable Rescue Mode
-      </Menu.Item>
-      
-      <Menu.Item key="iso_attach" onClick={() => setISOModalVisible(true)}>
-        <SaveOutlined /> Attach ISO
-      </Menu.Item>
-      
-      <Menu.Item key="iso_detach" onClick={handleDetachISO}>
-        <SaveOutlined /> Detach ISO
-      </Menu.Item>
-    </Menu>
-  );
+      }
+    },
+    {
+      type: 'divider'
+    },
+    {
+      key: 'rdns',
+      icon: <GlobalOutlined />,
+      label: 'Manage Reverse DNS',
+      onClick: () => setRdnsModalVisible(true)
+    },
+    {
+      key: 'labels',
+      icon: <TagOutlined />,
+      label: 'Manage Labels',
+      onClick: () => setLabelsModalVisible(true)
+    },
+    {
+      type: 'divider'
+    },
+    {
+      key: 'create_image',
+      icon: <CameraOutlined />,
+      label: 'Create Image/Snapshot',
+      onClick: () => setCreateImageModalVisible(true)
+    },
+    {
+      key: 'request_console',
+      icon: <DesktopOutlined />,
+      label: 'Access Console',
+      onClick: handleRequestConsole
+    },
+    {
+      key: 'reset_password',
+      icon: <KeyOutlined />,
+      label: 'Reset Password',
+      onClick: handleResetPassword
+    },
+    {
+      type: 'divider'
+    },
+    {
+      key: 'rebuild',
+      icon: <ReloadOutlined />,
+      label: 'Rebuild Server',
+      onClick: () => setRebuildModalVisible(true)
+    },
+    {
+      key: 'reset',
+      icon: <UndoOutlined />,
+      label: 'Hard Reset',
+      onClick: () => handleServerAction('reset', 'Reset')
+    },
+    {
+      key: 'rescue_mode',
+      icon: <SafetyOutlined />,
+      label: 'Enable Rescue Mode',
+      onClick: () => setRescueModalVisible(true)
+    },
+    {
+      key: 'disable_rescue',
+      icon: <SafetyOutlined />,
+      label: 'Disable Rescue Mode',
+      onClick: handleDisableRescue
+    },
+    {
+      key: 'iso_attach',
+      icon: <SaveOutlined />,
+      label: 'Attach ISO',
+      onClick: () => setISOModalVisible(true)
+    },
+    {
+      key: 'iso_detach',
+      icon: <SaveOutlined />,
+      label: 'Detach ISO',
+      onClick: handleDetachISO
+    }
+  ];
 
   return (
     <div>
@@ -468,8 +496,8 @@ function ServerDetailPanel({ projectId, serverId }) {
             <Tag color="orange" style={{ padding: '4px 8px', fontSize: '14px' }}>
               {rootPassword}
             </Tag>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               onClick={() => {
                 navigator.clipboard.writeText(rootPassword);
                 message.success('Password copied to clipboard');
@@ -477,8 +505,8 @@ function ServerDetailPanel({ projectId, serverId }) {
             >
               Copy to Clipboard
             </Button>
-            <Button 
-              type="link" 
+            <Button
+              type="link"
               onClick={() => setRootPassword(null)}
             >
               Dismiss
@@ -486,7 +514,6 @@ function ServerDetailPanel({ projectId, serverId }) {
           </Space>
         </Card>
       )}
-
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={8}>
           <Card>
@@ -548,8 +575,8 @@ function ServerDetailPanel({ projectId, serverId }) {
             >
               Reboot
             </Button>
-            
-            <Dropdown overlay={actionsMenu} disabled={actionLoading}>
+            {/* استفاده از فرمت جدید Dropdown در Ant Design */}
+            <Dropdown menu={{ items: actionsMenuItems }} disabled={actionLoading}>
               <Button>
                 More Actions <DownOutlined />
               </Button>
@@ -572,29 +599,27 @@ function ServerDetailPanel({ projectId, serverId }) {
           </Descriptions.Item>
         </Descriptions>
       </Card>
-
+      
+      {/* مدال‌ها با پراپرتی open به جای visible برای سازگاری با نسخه جدید Ant Design */}
       <RebuildServerModal
-        visible={rebuildModalVisible}
+        open={rebuildModalVisible}
         onCancel={() => setRebuildModalVisible(false)}
         onSubmit={handleRebuildServer}
         projectId={projectId}
       />
-
       <RescueModeModal
-        visible={rescueModalVisible}
+        open={rescueModalVisible}
         onCancel={() => setRescueModalVisible(false)}
         onSubmit={handleEnableRescue}
         projectId={projectId}
         serverId={serverId}
       />
-
       <AttachISOModal
-        visible={isoModalVisible}
+        open={isoModalVisible}
         onCancel={() => setISOModalVisible(false)}
         onSubmit={handleAttachISO}
         projectId={projectId}
       />
-
       <Modal
         title="Rename Server"
         open={renameModalVisible}
@@ -615,21 +640,57 @@ function ServerDetailPanel({ projectId, serverId }) {
           </Form.Item>
         </Form>
       </Modal>
-      
-      <ChangePasswordModal 
-        visible={passwordModalVisible}
+      <ChangePasswordModal
+        open={passwordModalVisible}
         onCancel={() => setPasswordModalVisible(false)}
         onSubmit={handleChangePassword}
         loading={actionLoading}
       />
-      
       <ChangeTypeModal
-        visible={changeTypeModalVisible}
+        open={changeTypeModalVisible}
         onCancel={() => setChangeTypeModalVisible(false)}
         onSubmit={handleChangeType}
         projectId={projectId}
         currentType={server?.server_type}
         loading={actionLoading}
+      />
+      <ProtectionModal
+        open={protectionModalVisible}
+        onCancel={() => setProtectionModalVisible(false)}
+        onSubmit={handleProtection}
+        loading={actionLoading}
+        isEnable={enableProtection}
+        currentProtection={{
+          delete: server?.protection?.delete,
+          rebuild: server?.protection?.rebuild
+        }}
+      />
+      <RdnsModal
+        open={rdnsModalVisible}
+        onCancel={() => setRdnsModalVisible(false)}
+        onSubmit={handleChangeRdns}
+        loading={actionLoading}
+        serverIP={server?.ip}
+      />
+      <LabelsModal
+        open={labelsModalVisible}
+        onCancel={() => setLabelsModalVisible(false)}
+        onSubmit={handleUpdateLabels}
+        loading={actionLoading}
+        initialLabels={server?.labels}
+      />
+      <CreateImageModal
+        open={createImageModalVisible}
+        onCancel={() => setCreateImageModalVisible(false)}
+        onSubmit={handleCreateImage}
+        loading={actionLoading}
+      />
+      <ConsoleModal
+        open={consoleModalVisible}
+        onCancel={() => setConsoleModalVisible(false)}
+        consoleData={consoleData}
+        loading={actionLoading}
+        error={consoleError}
       />
     </div>
   );
