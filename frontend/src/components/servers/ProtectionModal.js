@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Form, Checkbox, Alert, Space, Typography } from 'antd';
-import { ShieldOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { SafetyOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
@@ -32,7 +32,7 @@ function ProtectionModal({ visible, onCancel, onSubmit, loading, isEnable = true
       <Alert
         message={
           <Space>
-            <ShieldOutlined />
+            <SafetyOutlined />
             {isEnable ? "Enable protection features" : "Disable protection features"}
           </Space>
         }
