@@ -11,7 +11,6 @@ import {
   DatabaseOutlined,
   KeyOutlined,
   GlobalOutlined,
-  HardDriveOutlined,
   SafetyOutlined,
   NodeIndexOutlined,
   DollarOutlined
@@ -71,8 +70,8 @@ function Sidebar({ collapsed, location }) {
               </Menu.Item>
             </SubMenu>
             
-            <SubMenu key="storage" icon={<HardDriveOutlined />} title={collapsed ? "" : "Storage"}>
-              <Menu.Item key={`/projects/${currentProject.id}/volumes`} icon={<HardDriveOutlined />}>
+            <SubMenu key="storage" icon={<HddOutlined />} title={collapsed ? "" : "Storage"}>
+              <Menu.Item key={`/projects/${currentProject.id}/volumes`} icon={<HddOutlined />}>
                 <Link to={`/projects/${currentProject.id}/volumes`}>Volumes</Link>
               </Menu.Item>
             </SubMenu>
