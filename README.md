@@ -19,6 +19,7 @@ docker volume create hetznerdock_data
 
 # Run the container
 docker run -d \
+  --restart always \
   --name hetznerdock \
   -p 8001:8000 \
   -v hetznerdock_data:/app/data \
@@ -83,6 +84,7 @@ docker volume create hetznerdock_data
 
 # Run the container
 docker run -d \
+  --restart always \
   --name hetznerdock \
   -p 8001:8000 \
   -v hetznerdock_data:/app/data \
