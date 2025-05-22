@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Select, Alert, Spin } from 'antd';
+import { Modal, Form, Select, Alert, Spin, message } from 'antd';
 import * as serverService from '../../api/services/serverService';
 
 function RebuildServerModal({ visible, onCancel, onSubmit, projectId }) {

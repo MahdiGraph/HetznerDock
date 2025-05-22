@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Checkbox, Alert, Space, Typography } from 'antd';
+import { Modal, Form, Checkbox, Alert, Space, Typography, message } from 'antd';
 import { SafetyOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;

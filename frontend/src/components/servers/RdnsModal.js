@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, Alert } from 'antd';
+import { Modal, Form, Input, Alert, message } from 'antd';
 import { GlobalOutlined } from '@ant-design/icons';
 
 function RdnsModal({ visible, onCancel, onSubmit, loading, serverIP }) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, Button, Alert } from 'antd';
+import { Modal, Form, Input, Button, Alert, message } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 
 function ChangePasswordModal({ visible, onCancel, onSubmit, loading }) {
