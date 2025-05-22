@@ -1,4 +1,3 @@
-// src/components/servers/ConsoleModal.js
 import React from 'react';
 import { Modal, Button, Alert, Typography, Input, Spin, message } from 'antd';
 import { LinkOutlined, CopyOutlined, LoginOutlined } from '@ant-design/icons';
@@ -11,8 +10,23 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
   };
 
   const openConsole = () => {
+    console.log("Opening console with URL:", consoleData?.wss_url);
     if (consoleData?.wss_url) {
-      window.open(consoleData.wss_url, '_blank');
+      try {
+        // بازکردن URL در یک پنجره جدید با پارامترهای امنیتی
+        const newWindow = window.open(consoleData.wss_url, '_blank', 'noopener,noreferrer');
+        
+        // بررسی اگر پنجره به درستی باز شده باشد
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          message.warn("Please allow pop-ups for this site to open the console.");
+        }
+      } catch (error) {
+        console.error("Error opening console:", error);
+        message.error("Failed to open console. Please check your browser settings.");
+      }
+    } else {
+      console.error("No wss_url available in consoleData:", consoleData);
+      message.error("Console URL not available.");
     }
   };
 

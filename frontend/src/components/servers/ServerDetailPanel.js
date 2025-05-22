@@ -161,7 +161,6 @@ function ServerDetailPanel({ projectId, serverId }) {
       const result = await serverService.changeServerPassword(projectId, serverId, password);
       message.success('Password changed successfully');
       setPasswordModalVisible(false);
-      // اگر پسورد جدید در پاسخ باشد، آن را نمایش می‌دهیم
       if (result.root_password) {
         setRootPassword(result.root_password);
       }
@@ -239,7 +238,6 @@ function ServerDetailPanel({ projectId, serverId }) {
       const result = await serverService.createServerImage(projectId, serverId, imageData);
       message.success(`Image created successfully: ${result.image.description}`);
       setCreateImageModalVisible(false);
-      // اگر پسورد نیاز باشد
       if (result.root_password) {
         setRootPassword(result.root_password);
       }
@@ -255,8 +253,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       setActionLoading(true);
       setConsoleError(null);
       const result = await serverService.requestServerConsole(projectId, serverId);
-      // نمایش اطلاعات وضعیت در کنسول برای عیب‌یابی
-      console.log("Console data:", result);
+      console.log("Console data received:", result);
       setConsoleData(result);
       setConsoleModalVisible(true);
     } catch (error) {
@@ -365,126 +362,161 @@ function ServerDetailPanel({ projectId, serverId }) {
     }
   };
 
-  // تعریف آیتم‌های منوی More Actions با ساختار جدید
-  const actionsMenuItems = [
+  // منوی آیتم‌ها را به صورت آرایه‌ای از آبجکت‌ها تعریف می‌کنیم
+  const menuItems = [
     {
       key: 'rename',
       icon: <EditOutlined />,
       label: 'Rename Server',
-      onClick: () => {
-        setServerNewName(server.name);
-        setRenameModalVisible(true);
-      }
     },
     {
       key: 'change_password',
       icon: <KeyOutlined />,
       label: 'Change Password',
-      onClick: () => setPasswordModalVisible(true)
     },
     {
       key: 'change_type',
       icon: <RiseOutlined />,
       label: 'Change Server Type',
-      onClick: () => setChangeTypeModalVisible(true)
     },
     {
-      type: 'divider'
+      type: 'divider',
     },
     {
       key: 'enable_protection',
       icon: <SafetyOutlined />,
       label: 'Enable Protection',
-      onClick: () => {
-        setEnableProtection(true);
-        setProtectionModalVisible(true);
-      }
     },
     {
       key: 'disable_protection',
       icon: <SafetyOutlined />,
       label: 'Disable Protection',
-      onClick: () => {
-        setEnableProtection(false);
-        setProtectionModalVisible(true);
-      }
     },
     {
-      type: 'divider'
+      type: 'divider',
     },
     {
       key: 'rdns',
       icon: <GlobalOutlined />,
       label: 'Manage Reverse DNS',
-      onClick: () => setRdnsModalVisible(true)
     },
     {
       key: 'labels',
       icon: <TagOutlined />,
       label: 'Manage Labels',
-      onClick: () => setLabelsModalVisible(true)
     },
     {
-      type: 'divider'
+      type: 'divider',
     },
     {
       key: 'create_image',
       icon: <CameraOutlined />,
       label: 'Create Image/Snapshot',
-      onClick: () => setCreateImageModalVisible(true)
     },
     {
       key: 'request_console',
       icon: <DesktopOutlined />,
       label: 'Access Console',
-      onClick: handleRequestConsole
     },
     {
       key: 'reset_password',
       icon: <KeyOutlined />,
       label: 'Reset Password',
-      onClick: handleResetPassword
     },
     {
-      type: 'divider'
+      type: 'divider',
     },
     {
       key: 'rebuild',
       icon: <ReloadOutlined />,
       label: 'Rebuild Server',
-      onClick: () => setRebuildModalVisible(true)
     },
     {
       key: 'reset',
       icon: <UndoOutlined />,
       label: 'Hard Reset',
-      onClick: () => handleServerAction('reset', 'Reset')
     },
     {
       key: 'rescue_mode',
       icon: <SafetyOutlined />,
       label: 'Enable Rescue Mode',
-      onClick: () => setRescueModalVisible(true)
     },
     {
       key: 'disable_rescue',
       icon: <SafetyOutlined />,
       label: 'Disable Rescue Mode',
-      onClick: handleDisableRescue
     },
     {
       key: 'iso_attach',
       icon: <SaveOutlined />,
       label: 'Attach ISO',
-      onClick: () => setISOModalVisible(true)
     },
     {
       key: 'iso_detach',
       icon: <SaveOutlined />,
       label: 'Detach ISO',
-      onClick: handleDetachISO
-    }
+    },
   ];
+
+  // هندلر کلیک برای منو
+  const handleMenuClick = (e) => {
+    console.log('Menu item clicked:', e.key);
+    switch (e.key) {
+      case 'rename':
+        setServerNewName(server.name);
+        setRenameModalVisible(true);
+        break;
+      case 'change_password':
+        setPasswordModalVisible(true);
+        break;
+      case 'change_type':
+        setChangeTypeModalVisible(true);
+        break;
+      case 'enable_protection':
+        setEnableProtection(true);
+        setProtectionModalVisible(true);
+        break;
+      case 'disable_protection':
+        setEnableProtection(false);
+        setProtectionModalVisible(true);
+        break;
+      case 'rdns':
+        setRdnsModalVisible(true);
+        break;
+      case 'labels':
+        setLabelsModalVisible(true);
+        break;
+      case 'create_image':
+        setCreateImageModalVisible(true);
+        break;
+      case 'request_console':
+        handleRequestConsole();
+        break;
+      case 'reset_password':
+        handleResetPassword();
+        break;
+      case 'rebuild':
+        setRebuildModalVisible(true);
+        break;
+      case 'reset':
+        handleServerAction('reset', 'Reset');
+        break;
+      case 'rescue_mode':
+        setRescueModalVisible(true);
+        break;
+      case 'disable_rescue':
+        handleDisableRescue();
+        break;
+      case 'iso_attach':
+        setISOModalVisible(true);
+        break;
+      case 'iso_detach':
+        handleDetachISO();
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <div>
@@ -575,8 +607,17 @@ function ServerDetailPanel({ projectId, serverId }) {
             >
               Reboot
             </Button>
-            {/* استفاده از فرمت جدید Dropdown در Ant Design */}
-            <Dropdown menu={{ items: actionsMenuItems }} disabled={actionLoading}>
+            
+            {/* استفاده از کامپوننت جدید Dropdown با تنظیمات بهینه */}
+            <Dropdown 
+              menu={{ 
+                items: menuItems,
+                onClick: handleMenuClick
+              }} 
+              trigger={['click']} 
+              disabled={actionLoading}
+              placement="bottomRight"
+            >
               <Button>
                 More Actions <DownOutlined />
               </Button>
@@ -600,7 +641,6 @@ function ServerDetailPanel({ projectId, serverId }) {
         </Descriptions>
       </Card>
       
-      {/* مدال‌ها با پراپرتی open به جای visible برای سازگاری با نسخه جدید Ant Design */}
       <RebuildServerModal
         open={rebuildModalVisible}
         onCancel={() => setRebuildModalVisible(false)}
