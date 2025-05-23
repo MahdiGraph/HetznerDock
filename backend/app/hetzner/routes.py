@@ -3065,33 +3065,6 @@ def disable_server_protection(
         )
         raise HTTPException(status_code=500, detail=f"Error disabling server protection: {str(e)}")
 
-# Enable or disable protection for a server
-@router.post("/projects/{project_id}/servers/{server_id}/change_protection")
-def change_server_protection(project_id: int, server_id: int,
-                              protection: ServerProtection,
-                              db: Session = Depends(get_db),
-                              current_user: models.User = Depends(get_current_user)):
-    """Change protection (delete/rebuild) for a server."""
-    client, project = get_hetzner_client(project_id, db, current_user)
-    try:
-        server = client.servers.get_by_id(server_id)
-        # Use change_protection (True to enable, False to disable)
-        server.change_protection(delete=protection.delete, rebuild=protection.rebuild)
-        # Log and respond
-        state = "enabled" if protection.delete or protection.rebuild else "disabled"
-        protections = []
-        if protection.delete: protections.append("delete")
-        if protection.rebuild: protections.append("rebuild")
-        log_action(db=db, action="SERVER_CHANGE_PROTECTION",
-                   details=f"{state.capitalize()} {', '.join(protections)} protection for server '{server.name}'",
-                   status="success", project_id=project.id, user_id=current_user.id)
-        return {"message": f"Protection {state} for server '{server.name}'"}
-    except Exception as e:
-        log_action(db=db, action="SERVER_CHANGE_PROTECTION",
-                   details=f"Error changing protection for server {server_id}: {str(e)}",
-                   status="failed", project_id=project.id, user_id=current_user.id)
-        raise HTTPException(status_code=500, detail=f"Error changing server protection: {str(e)}")
-
 # تنظیم DNS معکوس
 @router.post("/projects/{project_id}/servers/{server_id}/change_rdns")
 def change_server_rdns(project_id: int, server_id: int,
