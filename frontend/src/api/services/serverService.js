@@ -103,7 +103,7 @@ export const changeServerPassword = async (projectId, serverId, password) => {
 };
 
 export const changeServerType = async (projectId, serverId, serverType, upgradeDisk = true) => {
-  const response = await api.post(`/projects/${projectId}/servers/${serverId}/change_type`, { 
+  const response = await api.post(`/projects/${projectId}/servers/${serverId}/change_type`, {
     server_type: serverType,
     upgrade_disk: upgradeDisk
   });

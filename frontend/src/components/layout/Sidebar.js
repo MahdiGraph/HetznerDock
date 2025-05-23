@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar.js
 import React from 'react';
 import { Layout, Menu } from 'antd';
 import { Link } from 'react-router-dom';
@@ -23,7 +24,7 @@ const { SubMenu } = Menu;
 
 function Sidebar({ collapsed, location }) {
   const { currentProject } = useProjects();
-  
+
   return (
     <Sider
       trigger={null}
@@ -53,7 +54,7 @@ function Sidebar({ collapsed, location }) {
         <Menu.Item key="/projects" icon={<CodeOutlined />}>
           <Link to="/projects">Projects</Link>
         </Menu.Item>
-        
+
         {currentProject && (
           <>
             <SubMenu key="project" icon={<CloudServerOutlined />} title={collapsed ? "" : "Compute"}>
@@ -66,20 +67,17 @@ function Sidebar({ collapsed, location }) {
               <Menu.Item key={`/projects/${currentProject.id}/ssh-keys`} icon={<KeyOutlined />}>
                 <Link to={`/projects/${currentProject.id}/ssh-keys`}>SSH Keys</Link>
               </Menu.Item>
-              <Menu.Item key={`/projects/${currentProject.id}/server-types`} icon={<SettingOutlined />}>
-                <Link to={`/projects/${currentProject.id}/server-types`}>Server Types</Link>
-              </Menu.Item>
               <Menu.Item key={`/projects/${currentProject.id}/snapshots`} icon={<CameraOutlined />}>
                 <Link to={`/projects/${currentProject.id}/snapshots`}>Snapshots</Link>
               </Menu.Item>
             </SubMenu>
-            
+
             <SubMenu key="storage" icon={<HddOutlined />} title={collapsed ? "" : "Storage"}>
               <Menu.Item key={`/projects/${currentProject.id}/volumes`} icon={<HddOutlined />}>
                 <Link to={`/projects/${currentProject.id}/volumes`}>Volumes</Link>
               </Menu.Item>
             </SubMenu>
-            
+
             <SubMenu key="network" icon={<GlobalOutlined />} title={collapsed ? "" : "Network"}>
               <Menu.Item key={`/projects/${currentProject.id}/floating-ips`} icon={<GlobalOutlined />}>
                 <Link to={`/projects/${currentProject.id}/floating-ips`}>Floating IPs</Link>
@@ -93,7 +91,7 @@ function Sidebar({ collapsed, location }) {
             </SubMenu>
           </>
         )}
-        
+
         <SubMenu key="settings" icon={<SettingOutlined />} title="Settings">
           <Menu.Item key="/logs" icon={<HistoryOutlined />}>
             <Link to="/logs">System Logs</Link>
@@ -104,7 +102,7 @@ function Sidebar({ collapsed, location }) {
                 <Link to={`/projects/${currentProject.id}/system-logs`}>Action Logs</Link>
               </Menu.Item>
               <Menu.Item key={`/projects/${currentProject.id}/pricing`} icon={<DollarOutlined />}>
-                <Link to={`/projects/${currentProject.id}/pricing`}>Pricing</Link>
+                <Link to={`/projects/${currentProject.id}/pricing`}>Pricing & Server Types</Link>
               </Menu.Item>
             </>
           )}
