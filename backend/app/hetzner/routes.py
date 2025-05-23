@@ -770,7 +770,20 @@ def attach_iso(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         server = client.servers.get_by_id(server_id)
-        server.attach_iso(iso_data.iso)
+        iso_name = iso_data.iso
+        iso_obj = None
+        try:
+            iso_obj = client.isos.get_by_id(int(iso_name))
+        except:
+            iso_obj = None
+        if not iso_obj:
+            # If not found by ID or if iso_name is not numeric, try by name
+            iso_list = client.isos.get_all(name=iso_name)
+            if iso_list:
+                iso_obj = iso_list[0]
+        if not iso_obj:
+            raise HTTPException(status_code=404, detail=f"ISO '{iso_name}' not found")
+        server.attach_iso(iso_obj)
         
         # Log ISO attachment
         log_action(
@@ -3052,87 +3065,75 @@ def disable_server_protection(
         )
         raise HTTPException(status_code=500, detail=f"Error disabling server protection: {str(e)}")
 
+# Enable or disable protection for a server
+@router.post("/projects/{project_id}/servers/{server_id}/change_protection")
+def change_server_protection(project_id: int, server_id: int,
+                              protection: ServerProtection,
+                              db: Session = Depends(get_db),
+                              current_user: models.User = Depends(get_current_user)):
+    """Change protection (delete/rebuild) for a server."""
+    client, project = get_hetzner_client(project_id, db, current_user)
+    try:
+        server = client.servers.get_by_id(server_id)
+        # Use change_protection (True to enable, False to disable)
+        server.change_protection(delete=protection.delete, rebuild=protection.rebuild)
+        # Log and respond
+        state = "enabled" if protection.delete or protection.rebuild else "disabled"
+        protections = []
+        if protection.delete: protections.append("delete")
+        if protection.rebuild: protections.append("rebuild")
+        log_action(db=db, action="SERVER_CHANGE_PROTECTION",
+                   details=f"{state.capitalize()} {', '.join(protections)} protection for server '{server.name}'",
+                   status="success", project_id=project.id, user_id=current_user.id)
+        return {"message": f"Protection {state} for server '{server.name}'"}
+    except Exception as e:
+        log_action(db=db, action="SERVER_CHANGE_PROTECTION",
+                   details=f"Error changing protection for server {server_id}: {str(e)}",
+                   status="failed", project_id=project.id, user_id=current_user.id)
+        raise HTTPException(status_code=500, detail=f"Error changing server protection: {str(e)}")
+
 # تنظیم DNS معکوس
 @router.post("/projects/{project_id}/servers/{server_id}/change_rdns")
-def change_server_rdns(
-    project_id: int,
-    server_id: int,
-    rdns_data: ServerRdnsSettings,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """Change reverse DNS settings for a server IP"""
+def change_server_rdns(project_id: int, server_id: int,
+                        rdns: ServerRdnsSettings,
+                        db: Session = Depends(get_db),
+                        current_user: models.User = Depends(get_current_user)):
+    """Change reverse DNS for a server IP."""
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         server = client.servers.get_by_id(server_id)
-        server.change_rdns(ip=rdns_data.ip, dns_ptr=rdns_data.dns_ptr)
-        
-        # Log RDNS change
-        log_action(
-            db=db,
-            action="SERVER_CHANGE_RDNS",
-            details=f"Changed reverse DNS for server '{server.name}' IP {rdns_data.ip} to '{rdns_data.dns_ptr}'",
-            status="success",
-            project_id=project.id,
-            user_id=current_user.id
-        )
-        
-        return {
-            "message": f"Reverse DNS changed successfully for server '{server.name}'"
-        }
+        server.change_dns_ptr(ip=rdns.ip, dns_ptr=rdns.dns_ptr)  # use correct method
+        log_action(db=db, action="SERVER_CHANGE_RDNS",
+                   details=f"Changed reverse DNS for server '{server.name}' IP {rdns.ip} to '{rdns.dns_ptr}'",
+                   status="success", project_id=project.id, user_id=current_user.id)
+        return {"message": f"RDNS updated for IP {rdns.ip} on server '{server.name}'."}
     except Exception as e:
-        # Log error
-        log_action(
-            db=db,
-            action="SERVER_CHANGE_RDNS",
-            details=f"Error changing reverse DNS for server {server_id}: {str(e)}",
-            status="failed",
-            project_id=project.id,
-            user_id=current_user.id
-        )
+        log_action(db=db, action="SERVER_CHANGE_RDNS",
+                   details=f"Error changing reverse DNS for server {server_id}: {str(e)}",
+                   status="failed", project_id=project.id, user_id=current_user.id)
         raise HTTPException(status_code=500, detail=f"Error changing reverse DNS: {str(e)}")
-
+    
 # به‌روزرسانی برچسب‌های سرور
 @router.put("/projects/{project_id}/servers/{server_id}/labels")
-def update_server_labels(
-    project_id: int,
-    server_id: int,
-    labels_data: ServerLabels,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """Update labels for a server"""
+def update_server_labels(project_id: int, server_id: int,
+                          labels_data: ServerLabels,
+                          db: Session = Depends(get_db),
+                          current_user: models.User = Depends(get_current_user)):
+    """Update a server's labels."""
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         server = client.servers.get_by_id(server_id)
-        server.update_labels(labels_data.labels)
-        
-        # Log labels update
-        log_action(
-            db=db,
-            action="SERVER_UPDATE_LABELS",
-            details=f"Updated labels for server '{server.name}'",
-            status="success",
-            project_id=project.id,
-            user_id=current_user.id
-        )
-        
-        return {
-            "message": f"Labels updated successfully for server '{server.name}'",
-            "labels": labels_data.labels
-        }
+        server.update(labels=labels_data.labels)  # use update method for labels
+        log_action(db=db, action="SERVER_UPDATE_LABELS",
+                   details=f"Updated labels for server '{server.name}'",
+                   status="success", project_id=project.id, user_id=current_user.id)
+        return {"message": f"Labels updated for server '{server.name}'."}
     except Exception as e:
-        # Log error
-        log_action(
-            db=db,
-            action="SERVER_UPDATE_LABELS",
-            details=f"Error updating labels for server {server_id}: {str(e)}",
-            status="failed",
-            project_id=project.id,
-            user_id=current_user.id
-        )
+        log_action(db=db, action="SERVER_UPDATE_LABELS",
+                   details=f"Error updating labels for server {server_id}: {str(e)}",
+                   status="failed", project_id=project.id, user_id=current_user.id)
         raise HTTPException(status_code=500, detail=f"Error updating server labels: {str(e)}")
-
+    
 # ایجاد تصویر/اسنپ‌شات از سرور
 @router.post("/projects/{project_id}/servers/{server_id}/create_image")
 def create_server_image(

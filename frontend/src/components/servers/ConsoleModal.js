@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Button, Alert, Typography, Input, Spin, message } from 'antd';
 import { LinkOutlined, CopyOutlined, LoginOutlined } from '@ant-design/icons';
+import { VncScreen } from 'react-vnc';
 const { Text, Paragraph } = Typography;
 
 function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
@@ -31,29 +32,12 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
   };
 
   return (
-    <Modal
-      title="VNC Console Access"
-      open={open}
-      onCancel={onCancel}
+    <Modal title="VNC Console Access" open={open} onCancel={onCancel} width={800}  // widen modal
       footer={[
-        <Button key="close" onClick={onCancel}>
-          Close
-        </Button>,
-        consoleData?.wss_url && (
-          <Button key="open" type="primary" icon={<LoginOutlined />} onClick={openConsole}>
-            Open Console
-          </Button>
-        )
-      ]}
-      width={600}
-    >
+        <Button key="close" onClick={onCancel}>Close</Button>
+      ]}>
       {error ? (
-        <Alert
-          message="Error"
-          description={error}
-          type="error"
-          showIcon
-        />
+        <Alert message="Error" description={error} type="error" showIcon />
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '30px 0' }}>
           <Spin size="large" />
@@ -61,67 +45,16 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
         </div>
       ) : consoleData ? (
         <>
-          <Alert
-            message="Console Access Granted"
-            description="You can now access the VNC console of your server. The credentials below will expire soon, so use them immediately."
-            type="success"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-          <Paragraph>
-            <Text strong>Console URL:</Text>
-            <div style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
-              <Input
-                value={consoleData.wss_url}
-                readOnly
-                addonAfter={
-                  <Button
-                    icon={<CopyOutlined />}
-                    onClick={() => copyToClipboard(consoleData.wss_url)}
-                    type="text"
-                    size="small"
-                  />
-                }
-              />
-            </div>
-          </Paragraph>
-          <Paragraph>
-            <Text strong>Password:</Text>
-            <div style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
-              <Input
-                value={consoleData.password}
-                readOnly
-                addonAfter={
-                  <Button
-                    icon={<CopyOutlined />}
-                    onClick={() => copyToClipboard(consoleData.password)}
-                    type="text"
-                    size="small"
-                  />
-                }
-              />
-            </div>
-          </Paragraph>
-          {consoleData.expires_at && (
-            <Paragraph>
-              <Text strong>Expires:</Text> {new Date(consoleData.expires_at).toLocaleString()}
-            </Paragraph>
-          )}
-          <Alert
-            message="Note"
-            description="The console access is temporary and will expire. If you need access later, request a new console session."
-            type="info"
-            showIcon
-          />
+          <Alert message="Console Access Granted"
+                 description="Using the embedded VNC client below. The session will expire shortly, so connect now."
+                 type="success" showIcon style={{ marginBottom: 16 }} />
+          {/* Embed the VNC screen */}
+          <div style={{ height: '600px', background: '#000' }}>
+            <VncScreen url={consoleData.wss_url} password={consoleData.password}
+                       scaleViewport background="#000" />
+          </div>
         </>
-      ) : (
-        <Alert
-          message="No console data"
-          description="No console data is available. Please try requesting again."
-          type="warning"
-          showIcon
-        />
-      )}
+      ) : null}
     </Modal>
   );
 }
