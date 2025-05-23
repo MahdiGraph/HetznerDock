@@ -9,7 +9,6 @@ from ..database import crud, models
 from ..database.database import get_db
 from ..auth.jwt import get_current_user
 from ..app_logger.logger import log_action
-
 router = APIRouter()
 
 # Request and response models
@@ -151,7 +150,7 @@ class TargetCreate(BaseModel):
     server_id: Optional[int] = None  # Required for type="server"
     ip: Optional[Dict[str, str]] = None  # Required for type="ip", {ip: str}
     use_private_ip: Optional[bool] = None
-    
+
 class LoadBalancerServiceCreate(BaseModel):
     protocol: str  # "http", "https", "tcp"
     listen_port: int
@@ -159,7 +158,7 @@ class LoadBalancerServiceCreate(BaseModel):
     proxyprotocol: Optional[bool] = None
     http: Optional[Dict[str, Any]] = None  # For HTTP(S) health checks
     health_check: Optional[Dict[str, Any]] = None
-    
+
 class LoadBalancerCreate(BaseModel):
     name: str
     load_balancer_type: str
@@ -191,7 +190,7 @@ class CertificateUpdate(BaseModel):
 # Server additional operations models
 class ServerRebuild(BaseModel):
     image: str
-    
+
 class ServerEnableRescue(BaseModel):
     type: Optional[str] = None  # "linux32", "linux64", or "freebsd64"
     ssh_keys: Optional[List[int]] = None
@@ -201,6 +200,30 @@ class ServerAttachISO(BaseModel):
 
 class ServerRename(BaseModel):
     name: str
+
+# مدل‌های جدید مدیریت سرور
+class ServerChangePassword(BaseModel):
+    password: str
+
+class ServerChangeType(BaseModel):
+    server_type: str
+    upgrade_disk: Optional[bool] = True
+
+class ServerProtection(BaseModel):
+    delete: Optional[bool] = True
+    rebuild: Optional[bool] = True
+
+class ServerRdnsSettings(BaseModel):
+    ip: str
+    dns_ptr: str
+
+class ServerLabels(BaseModel):
+    labels: Dict[str, str]
+
+class ServerImage(BaseModel):
+    type: Optional[str] = "snapshot"  # snapshot یا backup
+    description: Optional[str] = None
+    labels: Optional[Dict[str, str]] = None
 
 # Helper function to get Hetzner client
 def get_hetzner_client(project_id: int, db: Session, user: models.User):
@@ -641,7 +664,6 @@ def rebuild_server(
     try:
         server = client.servers.get_by_id(server_id)
         response = server.rebuild(image=rebuild_data.image)
-        
         # Log server rebuild
         log_action(
             db=db,
@@ -651,7 +673,6 @@ def rebuild_server(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Server '{server.name}' rebuild initiated",
             "root_password": response.root_password if hasattr(response, "root_password") else None
@@ -681,19 +702,15 @@ def enable_rescue_mode(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         server = client.servers.get_by_id(server_id)
-        
         rescue_type = None
         ssh_keys = None
-        
         if rescue_data:
             rescue_type = rescue_data.type
             ssh_keys = rescue_data.ssh_keys
-            
         response = server.enable_rescue(
             type=rescue_type,
             ssh_keys=ssh_keys
         )
-        
         # Log rescue mode enablement
         log_action(
             db=db,
@@ -703,7 +720,6 @@ def enable_rescue_mode(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Rescue mode enabled for server '{server.name}'",
             "root_password": response.root_password if hasattr(response, "root_password") else None
@@ -733,7 +749,6 @@ def disable_rescue_mode(
     try:
         server = client.servers.get_by_id(server_id)
         server.disable_rescue()
-        
         # Log rescue mode disablement
         log_action(
             db=db,
@@ -743,7 +758,6 @@ def disable_rescue_mode(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Rescue mode disabled for server '{server.name}'"}
     except Exception as e:
         # Log error
@@ -784,7 +798,6 @@ def attach_iso(
         if not iso_obj:
             raise HTTPException(status_code=404, detail=f"ISO '{iso_name}' not found")
         server.attach_iso(iso_obj)
-        
         # Log ISO attachment
         log_action(
             db=db,
@@ -794,7 +807,6 @@ def attach_iso(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"ISO '{iso_data.iso}' attached to server '{server.name}'"}
     except Exception as e:
         # Log error
@@ -821,7 +833,6 @@ def detach_iso(
     try:
         server = client.servers.get_by_id(server_id)
         server.detach_iso()
-        
         # Log ISO detachment
         log_action(
             db=db,
@@ -831,7 +842,6 @@ def detach_iso(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"ISO detached from server '{server.name}'"}
     except Exception as e:
         # Log error
@@ -858,7 +868,6 @@ def reset_server(
     try:
         server = client.servers.get_by_id(server_id)
         server.reset()
-        
         # Log server reset
         log_action(
             db=db,
@@ -868,7 +877,6 @@ def reset_server(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Server '{server.name}' is resetting"}
     except Exception as e:
         # Log error
@@ -999,7 +1007,6 @@ def list_server_types(
                 "disk": st.disk,
                 "prices": []
             }
-            
             # Safely handle prices
             if hasattr(st, 'prices') and st.prices:
                 try:
@@ -1009,9 +1016,7 @@ def list_server_types(
                             location_name = "unknown"
                             if hasattr(price, 'location') and price.location:
                                 location_name = price.location.name if hasattr(price.location, 'name') else "unknown"
-                            
                             price_monthly = 0
-                            
                             # Try multiple paths to get the price
                             if hasattr(price, 'price_monthly'):
                                 if hasattr(price.price_monthly, 'gross'):
@@ -1023,14 +1028,12 @@ def list_server_types(
                                         price_monthly = float(price.price_monthly)
                                     except (ValueError, TypeError):
                                         pass
-                            
                             # Also try direct pricing info if it exists
                             if hasattr(price, 'gross') and price_monthly == 0:
                                 try:
                                     price_monthly = float(price.gross)
                                 except (ValueError, TypeError):
                                     pass
-                            
                             # If we found a price via any method, add it
                             price_data = {
                                 "location": location_name,
@@ -1042,9 +1045,7 @@ def list_server_types(
                             continue
                 except Exception as e:
                     print(f"Error iterating prices: {str(e)}")
-            
             result.append(server_type_data)
-        
         return {
             "server_types": result
         }
@@ -1061,7 +1062,7 @@ def list_server_types(
         )
         print(f"Server types error: {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
-    
+
 # SSH Keys endpoints
 @router.get("/projects/{project_id}/ssh_keys")
 def list_ssh_keys(
@@ -1199,13 +1200,10 @@ def update_ssh_key(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         ssh_key = client.ssh_keys.get_by_id(ssh_key_id)
-        
         if ssh_key_data.name is not None:
             ssh_key.update(name=ssh_key_data.name)
-        
         if ssh_key_data.labels is not None:
             ssh_key.update_labels(ssh_key_data.labels)
-        
         # Log SSH key update
         log_action(
             db=db,
@@ -1215,10 +1213,8 @@ def update_ssh_key(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # Get updated SSH key
         updated_ssh_key = client.ssh_keys.get_by_id(ssh_key_id)
-        
         return {
             "id": updated_ssh_key.id,
             "name": updated_ssh_key.name,
@@ -1251,7 +1247,6 @@ def delete_ssh_key(
         ssh_key = client.ssh_keys.get_by_id(ssh_key_id)
         ssh_key_name = ssh_key.name
         ssh_key.delete()
-        
         # Log SSH key deletion
         log_action(
             db=db,
@@ -1261,7 +1256,6 @@ def delete_ssh_key(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"SSH key '{ssh_key_name}' deleted successfully"}
     except Exception as e:
         # Log error
@@ -1336,15 +1330,11 @@ def create_floating_ip(
             "type": floating_ip_data.type,
             "description": floating_ip_data.description,
         }
-        
         if floating_ip_data.home_location:
             create_params["home_location"] = floating_ip_data.home_location
-            
         if floating_ip_data.server:
             create_params["server"] = floating_ip_data.server
-            
         response = client.floating_ips.create(**create_params)
-        
         # Log floating IP creation
         log_action(
             db=db,
@@ -1354,7 +1344,6 @@ def create_floating_ip(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "id": response.floating_ip.id,
             "description": response.floating_ip.description,
@@ -1431,13 +1420,10 @@ def update_floating_ip(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         floating_ip = client.floating_ips.get_by_id(floating_ip_id)
-        
         if floating_ip_data.description is not None:
             floating_ip.update(description=floating_ip_data.description)
-        
         if floating_ip_data.labels is not None:
             floating_ip.update_labels(floating_ip_data.labels)
-        
         # Log floating IP update
         log_action(
             db=db,
@@ -1447,10 +1433,8 @@ def update_floating_ip(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # Get updated floating IP
         updated_floating_ip = client.floating_ips.get_by_id(floating_ip_id)
-        
         return {
             "id": updated_floating_ip.id,
             "description": updated_floating_ip.description,
@@ -1485,7 +1469,6 @@ def delete_floating_ip(
     try:
         floating_ip = client.floating_ips.get_by_id(floating_ip_id)
         floating_ip.delete()
-        
         # Log floating IP deletion
         log_action(
             db=db,
@@ -1495,7 +1478,6 @@ def delete_floating_ip(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Floating IP {floating_ip_id} deleted successfully"}
     except Exception as e:
         # Log error
@@ -1522,7 +1504,6 @@ def assign_floating_ip(
     try:
         floating_ip = client.floating_ips.get_by_id(floating_ip_id)
         floating_ip.assign(server=assign_data.server)
-        
         # Log floating IP assignment
         log_action(
             db=db,
@@ -1532,7 +1513,6 @@ def assign_floating_ip(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Floating IP {floating_ip_id} assigned to server {assign_data.server}"}
     except Exception as e:
         # Log error
@@ -1558,7 +1538,6 @@ def unassign_floating_ip(
     try:
         floating_ip = client.floating_ips.get_by_id(floating_ip_id)
         floating_ip.unassign()
-        
         # Log floating IP unassignment
         log_action(
             db=db,
@@ -1568,7 +1547,6 @@ def unassign_floating_ip(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Floating IP {floating_ip_id} unassigned"}
     except Exception as e:
         # Log error
@@ -1646,21 +1624,15 @@ def create_volume(
             "name": volume_data.name,
             "size": volume_data.size,
         }
-        
         if volume_data.location:
             create_params["location"] = volume_data.location
-            
         if volume_data.server:
             create_params["server"] = volume_data.server
-            
         if volume_data.automount is not None:
             create_params["automount"] = volume_data.automount
-            
         if volume_data.format:
             create_params["format"] = volume_data.format
-            
         response = client.volumes.create(**create_params)
-        
         # Log volume creation
         log_action(
             db=db,
@@ -1670,7 +1642,6 @@ def create_volume(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "id": response.volume.id,
             "name": response.volume.name,
@@ -1753,13 +1724,10 @@ def update_volume(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         volume = client.volumes.get_by_id(volume_id)
-        
         if volume_data.name is not None:
             volume.update(name=volume_data.name)
-        
         if volume_data.labels is not None:
             volume.update_labels(volume_data.labels)
-        
         # Log volume update
         log_action(
             db=db,
@@ -1769,10 +1737,8 @@ def update_volume(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # Get updated volume
         updated_volume = client.volumes.get_by_id(volume_id)
-        
         return {
             "id": updated_volume.id,
             "name": updated_volume.name,
@@ -1811,7 +1777,6 @@ def delete_volume(
         volume = client.volumes.get_by_id(volume_id)
         volume_name = volume.name
         volume.delete()
-        
         # Log volume deletion
         log_action(
             db=db,
@@ -1821,7 +1786,6 @@ def delete_volume(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Volume '{volume_name}' deleted successfully"}
     except Exception as e:
         # Log error
@@ -1848,7 +1812,6 @@ def resize_volume(
     try:
         volume = client.volumes.get_by_id(volume_id)
         volume.resize(size=resize_data.size)
-        
         # Log volume resize
         log_action(
             db=db,
@@ -1858,7 +1821,6 @@ def resize_volume(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Volume {volume_id} resized to {resize_data.size}GB"}
     except Exception as e:
         # Log error
@@ -1884,16 +1846,12 @@ def attach_volume(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         volume = client.volumes.get_by_id(volume_id)
-        
         attach_params = {
             "server": attach_data.server
         }
-        
         if attach_data.automount is not None:
             attach_params["automount"] = attach_data.automount
-        
         volume.attach(**attach_params)
-        
         # Log volume attachment
         log_action(
             db=db,
@@ -1903,7 +1861,6 @@ def attach_volume(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Volume {volume_id} attached to server {attach_data.server}"}
     except Exception as e:
         # Log error
@@ -1929,7 +1886,6 @@ def detach_volume(
     try:
         volume = client.volumes.get_by_id(volume_id)
         volume.detach()
-        
         # Log volume detachment
         log_action(
             db=db,
@@ -1939,7 +1895,6 @@ def detach_volume(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Volume {volume_id} detached"}
     except Exception as e:
         # Log error
@@ -1986,7 +1941,7 @@ def list_firewalls(
                             "destination_ips": rule.destination_ips if hasattr(rule, 'destination_ips') else None,
                             "port": rule.port if hasattr(rule, 'port') else None,
                             "description": rule.description if hasattr(rule, 'description') else None
-                        } 
+                        }
                         for rule in fw.rules
                     ],
                     "applied_to": [
@@ -2042,13 +1997,11 @@ def create_firewall(
             if rule.description:
                 rule_dict["description"] = rule.description
             rules.append(rule_dict)
-        
         response = client.firewalls.create(
             name=firewall_data.name,
             rules=rules,
             labels=firewall_data.labels
         )
-        
         # Log firewall creation
         log_action(
             db=db,
@@ -2058,7 +2011,6 @@ def create_firewall(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "id": response.firewall.id,
             "name": response.firewall.name,
@@ -2157,13 +2109,10 @@ def update_firewall(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         firewall = client.firewalls.get_by_id(firewall_id)
-        
         if firewall_data.name is not None:
             firewall.update(name=firewall_data.name)
-        
         if firewall_data.labels is not None:
             firewall.update_labels(firewall_data.labels)
-        
         # Log firewall update
         log_action(
             db=db,
@@ -2173,10 +2122,8 @@ def update_firewall(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # Get updated firewall
         updated_firewall = client.firewalls.get_by_id(firewall_id)
-        
         return {
             "id": updated_firewall.id,
             "name": updated_firewall.name,
@@ -2217,7 +2164,6 @@ def delete_firewall(
         firewall = client.firewalls.get_by_id(firewall_id)
         firewall_name = firewall.name
         firewall.delete()
-        
         # Log firewall deletion
         log_action(
             db=db,
@@ -2227,7 +2173,6 @@ def delete_firewall(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Firewall '{firewall_name}' deleted successfully"}
     except Exception as e:
         # Log error
@@ -2316,10 +2261,8 @@ def create_network(
             "name": network_data.name,
             "ip_range": network_data.ip_range,
         }
-        
         if network_data.labels:
             create_params["labels"] = network_data.labels
-            
         if network_data.subnets:
             create_params["subnets"] = [
                 {
@@ -2330,9 +2273,7 @@ def create_network(
                 }
                 for subnet in network_data.subnets
             ]
-            
         response = client.networks.create(**create_params)
-        
         # Log network creation
         log_action(
             db=db,
@@ -2342,7 +2283,6 @@ def create_network(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "id": response.network.id,
             "name": response.network.name,
@@ -2438,13 +2378,10 @@ def update_network(
     client, project = get_hetzner_client(project_id, db, current_user)
     try:
         network = client.networks.get_by_id(network_id)
-        
         if network_data.name is not None:
             network.update(name=network_data.name)
-        
         if network_data.labels is not None:
             network.update_labels(network_data.labels)
-        
         # Log network update
         log_action(
             db=db,
@@ -2454,10 +2391,8 @@ def update_network(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # Get updated network
         updated_network = client.networks.get_by_id(network_id)
-        
         return {
             "id": updated_network.id,
             "name": updated_network.name,
@@ -2498,7 +2433,6 @@ def delete_network(
         network = client.networks.get_by_id(network_id)
         network_name = network.name
         network.delete()
-        
         # Log network deletion
         log_action(
             db=db,
@@ -2508,7 +2442,6 @@ def delete_network(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {"message": f"Network '{network_name}' deleted successfully"}
     except Exception as e:
         # Log error
@@ -2586,7 +2519,6 @@ def get_pricing(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # داده‌های قیمت‌گذاری ثابت (نمونه)
         return {
             "server_types": {
@@ -2621,7 +2553,7 @@ def get_pricing(
         )
         print(f"Pricing error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving pricing information: {str(e)}")
-        
+
 @router.get("/projects/{project_id}/actions")
 def list_actions(
     project_id: int,
@@ -2646,9 +2578,7 @@ def list_actions(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         actions = []
-        
         # رویکرد محافظه‌کارانه: هر فراخوانی API را در یک بلوک try مجزا محصور می‌کنیم
         try:
             if resource_type and resource_id:
@@ -2690,7 +2620,6 @@ def list_actions(
         except Exception as e:
             print(f"Error getting actions: {str(e)}")
             actions = []
-            
         # تبدیل اکشن‌ها به فرمت استاندارد
         result_actions = []
         for action in actions:
@@ -2705,14 +2634,11 @@ def list_actions(
                     "resources": [],
                     "error": None
                 }
-                
                 # تبدیل تاریخ‌ها به رشته
                 if action_data["started"] and hasattr(action_data["started"], 'isoformat'):
                     action_data["started"] = action_data["started"].isoformat()
-                
                 if action_data["finished"] and hasattr(action_data["finished"], 'isoformat'):
                     action_data["finished"] = action_data["finished"].isoformat()
-                
                 # استخراج ایمن منابع
                 if hasattr(action, 'resources') and action.resources:
                     for resource in action.resources:
@@ -2724,7 +2650,6 @@ def list_actions(
                             action_data["resources"].append(resource_data)
                         except:
                             continue
-                
                 # استخراج ایمن خطاها
                 if hasattr(action, 'error') and action.error:
                     try:
@@ -2740,11 +2665,9 @@ def list_actions(
                             }
                     except:
                         action_data["error"] = None
-                
                 result_actions.append(action_data)
             except:
                 continue
-        
         # بازگرداندن اطلاعات صفحه‌بندی سازگار
         return {
             "actions": result_actions,
@@ -2769,7 +2692,7 @@ def list_actions(
                 }
             }
         }
-    
+
 # Logs endpoint
 @router.get("/projects/{project_id}/logs", response_model=List[LogResponse])
 def get_project_logs(
@@ -2802,7 +2725,6 @@ def rename_server(
     try:
         server = client.servers.get_by_id(server_id)
         server.update(name=rename_data.name)
-        
         # Log server rename
         log_action(
             db=db,
@@ -2812,10 +2734,8 @@ def rename_server(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # Get updated server details
         updated_server = client.servers.get_by_id(server_id)
-        
         return {
             "message": f"Server renamed successfully to '{rename_data.name}'",
             "server": {
@@ -2840,30 +2760,6 @@ def rename_server(
             user_id=current_user.id
         )
         raise HTTPException(status_code=500, detail=f"Error renaming server: {str(e)}")
-    
-# مدل‌های جدید مدیریت سرور
-class ServerChangePassword(BaseModel):
-    password: str
-
-class ServerChangeType(BaseModel):
-    server_type: str
-    upgrade_disk: Optional[bool] = True
-
-class ServerProtection(BaseModel):
-    delete: Optional[bool] = True
-    rebuild: Optional[bool] = True
-
-class ServerRdnsSettings(BaseModel):
-    ip: str
-    dns_ptr: str
-
-class ServerLabels(BaseModel):
-    labels: Dict[str, str]
-
-class ServerImage(BaseModel):
-    type: Optional[str] = "snapshot"  # snapshot یا backup
-    description: Optional[str] = None
-    labels: Optional[Dict[str, str]] = None
 
 # تغییر پسورد سرور
 @router.post("/projects/{project_id}/servers/{server_id}/change_password")
@@ -2879,7 +2775,6 @@ def change_server_password(
     try:
         server = client.servers.get_by_id(server_id)
         response = server.change_password(password_data.password)
-        
         # Log password change
         log_action(
             db=db,
@@ -2889,7 +2784,6 @@ def change_server_password(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Password changed successfully for server '{server.name}'",
             "root_password": response.root_password if hasattr(response, "root_password") else None
@@ -2921,7 +2815,6 @@ def change_server_type(
         server = client.servers.get_by_id(server_id)
         current_server_type = server.server_type
         new_server_type = None
-        
         try:
             new_server_type = client.server_types.get_by_name(type_data.server_type)
         except:
@@ -2931,23 +2824,19 @@ def change_server_type(
                 if st.name == type_data.server_type:
                     new_server_type = st
                     break
-                    
         if not new_server_type:
             raise HTTPException(status_code=404, detail=f"Server type '{type_data.server_type}' not found")
-        
         # بررسی محدودیت دیسک
         if hasattr(new_server_type, 'disk') and hasattr(current_server_type, 'disk'):
             if new_server_type.disk < current_server_type.disk:
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"Cannot change to a server type with smaller disk. Current: {current_server_type.disk}GB, Target: {new_server_type.disk}GB"
                 )
-        
         server.change_type(
             server_type=type_data.server_type,
             upgrade_disk=type_data.upgrade_disk
         )
-        
         # Log server type change
         log_action(
             db=db,
@@ -2957,7 +2846,6 @@ def change_server_type(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Server type changing to '{type_data.server_type}'. This may take a few minutes to complete."
         }
@@ -2972,7 +2860,7 @@ def change_server_type(
             user_id=current_user.id
         )
         raise HTTPException(status_code=500, detail=f"Error changing server type: {str(e)}")
-    
+
 # فعال کردن محافظت سرور
 @router.post("/projects/{project_id}/servers/{server_id}/enable_protection")
 def enable_server_protection(
@@ -2987,14 +2875,12 @@ def enable_server_protection(
     try:
         server = client.servers.get_by_id(server_id)
         server.enable_protection(delete=protection_data.delete, rebuild=protection_data.rebuild)
-        
         # Log protection enablement
         protections = []
         if protection_data.delete:
             protections.append("delete")
         if protection_data.rebuild:
             protections.append("rebuild")
-        
         log_action(
             db=db,
             action="SERVER_ENABLE_PROTECTION",
@@ -3003,7 +2889,6 @@ def enable_server_protection(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Protection enabled for server '{server.name}'"
         }
@@ -3033,14 +2918,12 @@ def disable_server_protection(
     try:
         server = client.servers.get_by_id(server_id)
         server.disable_protection(delete=protection_data.delete, rebuild=protection_data.rebuild)
-        
         # Log protection disablement
         protections = []
         if protection_data.delete:
             protections.append("delete")
         if protection_data.rebuild:
             protections.append("rebuild")
-        
         log_action(
             db=db,
             action="SERVER_DISABLE_PROTECTION",
@@ -3049,7 +2932,6 @@ def disable_server_protection(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Protection disabled for server '{server.name}'"
         }
@@ -3085,7 +2967,7 @@ def change_server_rdns(project_id: int, server_id: int,
                    details=f"Error changing reverse DNS for server {server_id}: {str(e)}",
                    status="failed", project_id=project.id, user_id=current_user.id)
         raise HTTPException(status_code=500, detail=f"Error changing reverse DNS: {str(e)}")
-    
+
 # به‌روزرسانی برچسب‌های سرور
 @router.put("/projects/{project_id}/servers/{server_id}/labels")
 def update_server_labels(project_id: int, server_id: int,
@@ -3106,7 +2988,7 @@ def update_server_labels(project_id: int, server_id: int,
                    details=f"Error updating labels for server {server_id}: {str(e)}",
                    status="failed", project_id=project.id, user_id=current_user.id)
         raise HTTPException(status_code=500, detail=f"Error updating server labels: {str(e)}")
-    
+
 # ایجاد تصویر/اسنپ‌شات از سرور
 @router.post("/projects/{project_id}/servers/{server_id}/create_image")
 def create_server_image(
@@ -3125,7 +3007,6 @@ def create_server_image(
             description=image_data.description,
             labels=image_data.labels
         )
-        
         # Log image creation
         log_action(
             db=db,
@@ -3135,7 +3016,6 @@ def create_server_image(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Image created successfully from server '{server.name}'",
             "image": {
@@ -3172,7 +3052,6 @@ def request_server_console(
     try:
         server = client.servers.get_by_id(server_id)
         response = server.request_console()
-        
         # ثبت لاگ موفقیت
         log_action(
             db=db,
@@ -3182,28 +3061,24 @@ def request_server_console(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         # ایمن استخراج کردن اطلاعات کنسول
         console_data = {
             "message": f"Console access granted for server '{server.name}'",
             "wss_url": getattr(response, 'wss_url', None),
             "password": getattr(response, 'password', None),
         }
-        
         # بررسی ایمن ویژگی expires با نام‌های مختلف احتمالی
         expires_at = None
         if hasattr(response, 'expires'):
             expires_at = response.expires
         elif hasattr(response, 'expires_at'):
             expires_at = response.expires_at
-        
         if expires_at and hasattr(expires_at, 'isoformat'):
             console_data["expires_at"] = expires_at.isoformat()
         else:
             # اگر تاریخ انقضا پیدا نشد، یک ساعت به زمان فعلی اضافه می‌کنیم
             from datetime import datetime, timedelta
             console_data["expires_at"] = (datetime.utcnow() + timedelta(hours=1)).isoformat()
-            
         return console_data
     except Exception as e:
         # ثبت خطا با جزئیات بیشتر
@@ -3218,7 +3093,7 @@ def request_server_console(
         )
         print(error_message)  # اضافه کردن لاگ در کنسول سرور برای عیب‌یابی
         raise HTTPException(status_code=500, detail=error_message)
-    
+
 # بازنشانی پسورد
 @router.post("/projects/{project_id}/servers/{server_id}/reset_password")
 def reset_server_password(
@@ -3232,7 +3107,6 @@ def reset_server_password(
     try:
         server = client.servers.get_by_id(server_id)
         response = server.reset_password()
-        
         # Log password reset
         log_action(
             db=db,
@@ -3242,7 +3116,6 @@ def reset_server_password(
             project_id=project.id,
             user_id=current_user.id
         )
-        
         return {
             "message": f"Password reset successfully for server '{server.name}'",
             "root_password": response.root_password if hasattr(response, "root_password") else None
