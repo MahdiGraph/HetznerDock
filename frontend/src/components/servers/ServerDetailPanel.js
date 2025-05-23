@@ -362,6 +362,7 @@ function ServerDetailPanel({ projectId, serverId }) {
     }
   };
 
+  /*
   // منوی آیتم‌ها را به صورت آرایه‌ای از آبجکت‌ها تعریف می‌کنیم
   let protectionItems;
   if (server.protection?.delete || server.protection?.rebuild) {
@@ -381,6 +382,7 @@ function ServerDetailPanel({ projectId, serverId }) {
       }
     ];
   }
+    */
   const menuItems = [
     {
       key: 'rename',
