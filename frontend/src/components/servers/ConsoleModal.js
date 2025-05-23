@@ -7,13 +7,32 @@ const { Text, Paragraph } = Typography;
 
 function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
   const [showVNC, setShowVNC] = useState(false);
-  
+
   // Reset state when modal is closed
   useEffect(() => {
     if (!open) {
       setShowVNC(false);
     }
   }, [open]);
+
+  const parseWssUrl = (wssUrl) => {
+    try {
+      const url = new URL(wssUrl);
+      
+      // استخراج هاست، پورت و مسیر
+      const host = url.hostname;
+      const port = url.port || (url.protocol === 'wss:' ? '443' : '80');
+      const encrypt = url.protocol === 'wss:' ? '1' : '0';
+      
+      // مسیر کامل شامل پارامترهای سرچ
+      const path = `${url.pathname}${url.search}`;
+      
+      return { host, port, encrypt, path };
+    } catch (error) {
+      console.error("Error parsing WebSocket URL:", error);
+      return null;
+    }
+  };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -22,12 +41,39 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
 
   const openConsole = () => {
     if (consoleData?.wss_url) {
-      // Create a URL for noVNC viewer
-      const vncURL = `/novnc/vnc.html?autoconnect=true&path=${encodeURIComponent(
-        new URL(consoleData.wss_url).pathname
-      )}&password=${encodeURIComponent(consoleData.password)}`;
+      try {
+        const urlParams = parseWssUrl(consoleData.wss_url);
+        
+        if (!urlParams) {
+          message.error('Invalid console URL format');
+          return;
+        }
+        
+        // ساخت لینک با فرمت درخواستی
+        const vncURL = `/novnc/vnc.html?autoconnect=true&host=${encodeURIComponent(urlParams.host)}&port=${urlParams.port}&encrypt=${urlParams.encrypt}&path=${encodeURIComponent(urlParams.path)}&password=${encodeURIComponent(consoleData.password)}`;
+
+        window.open(vncURL, '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        console.error("Error opening console:", error);
+        message.error('Error opening console');
+      }
+    }
+  };
+
+  const getVncEmbedUrl = () => {
+    if (!consoleData?.wss_url) return '';
+    
+    try {
+      const urlParams = parseWssUrl(consoleData.wss_url);
       
-      window.open(vncURL, '_blank', 'noopener,noreferrer');
+      if (!urlParams) {
+        return '';
+      }
+      
+      return `/novnc/vnc.html?autoconnect=true&host=${encodeURIComponent(urlParams.host)}&port=${urlParams.port}&encrypt=${urlParams.encrypt}&path=${encodeURIComponent(urlParams.path)}&password=${encodeURIComponent(consoleData.password)}`;
+    } catch (error) {
+      console.error("Error creating VNC embed URL:", error);
+      return '';
     }
   };
 
@@ -64,7 +110,7 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
                   The connection will expire after one hour.
                 </p>
                 <p>
-                  You can either use the embedded console below or open 
+                  You can either use the embedded console below or open
                   it in a new tab for a better experience.
                 </p>
               </div>
@@ -73,7 +119,7 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
             showIcon
             style={{ marginBottom: 16 }}
           />
-          
+
           <div style={{ marginBottom: 16 }}>
             <Text strong>WebSocket URL:</Text>
             <Input.Group compact>
@@ -82,14 +128,14 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
                 value={consoleData.wss_url}
                 readOnly
               />
-              <Button 
+              <Button
                 icon={<CopyOutlined />}
                 onClick={() => copyToClipboard(consoleData.wss_url)}
                 title="Copy to clipboard"
               />
             </Input.Group>
           </div>
-          
+
           <div style={{ marginBottom: 16 }}>
             <Text strong>Password:</Text>
             <Input.Group compact>
@@ -98,36 +144,34 @@ function ConsoleModal({ open, onCancel, consoleData, loading, error }) {
                 value={consoleData.password}
                 readOnly
               />
-              <Button 
+              <Button
                 icon={<CopyOutlined />}
                 onClick={() => copyToClipboard(consoleData.password)}
                 title="Copy to clipboard"
               />
             </Input.Group>
           </div>
-          
+
           <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 8 }}>
-            <Button 
-              type="primary" 
+            <Button
+              type="primary"
               icon={<LinkOutlined />}
               onClick={() => setShowVNC(!showVNC)}
             >
               {showVNC ? 'Hide' : 'Show'} Embedded Console
             </Button>
-            <Button 
+            <Button
               icon={<LoginOutlined />}
               onClick={openConsole}
             >
               Open in New Tab
             </Button>
           </div>
-          
+
           {showVNC && (
             <div style={{ height: '500px', border: '1px solid #d9d9d9', borderRadius: '2px', overflow: 'hidden' }}>
               <iframe
-                src={`/novnc/vnc.html?autoconnect=true&path=${encodeURIComponent(
-                  new URL(consoleData.wss_url).pathname
-                )}&password=${encodeURIComponent(consoleData.password)}`}
+                src={getVncEmbedUrl()}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 title="VNC Console"
                 allow="clipboard-read; clipboard-write"
