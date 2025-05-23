@@ -3,17 +3,17 @@ import { Modal, Form, Select, Alert, Spin, Checkbox, message } from 'antd';
 import * as serverService from '../../api/services/serverService';
 import * as sshKeyService from '../../api/services/sshKeyService';
 
-function RescueModeModal({ visible, onCancel, onSubmit, projectId, serverId }) {
+function RescueModeModal({ open, onCancel, onSubmit, projectId, serverId }) {
   const [form] = Form.useForm();
   const [sshKeys, setSSHKeys] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (visible && projectId) {
+    if (open && projectId) {
       fetchSSHKeys();
     }
-  }, [visible, projectId]);
+  }, [open, projectId]);
 
   const fetchSSHKeys = async () => {
     try {
@@ -41,7 +41,7 @@ function RescueModeModal({ visible, onCancel, onSubmit, projectId, serverId }) {
   return (
     <Modal
       title="Enable Rescue Mode"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText="Enable Rescue Mode"

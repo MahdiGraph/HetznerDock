@@ -3,7 +3,7 @@ import { Modal, Form, Input, Button, Alert } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 import { useAuth } from '../../context/AuthContext';
 
-function ChangePasswordModal({ visible, onCancel }) {
+function ChangePasswordModal({ open, onCancel }) {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,7 +29,7 @@ function ChangePasswordModal({ visible, onCancel }) {
   return (
     <Modal
       title="Change Password"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       footer={null}
     >

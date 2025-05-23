@@ -1,9 +1,8 @@
-// src/components/servers/RdnsModal.js
 import React, { useState } from 'react';
 import { Modal, Form, Input, Alert } from 'antd';
 import { GlobalOutlined } from '@ant-design/icons';
 
-function RdnsModal({ visible, onCancel, onSubmit, loading, serverIP }) {
+function RdnsModal({ open, onCancel, onSubmit, loading, serverIP }) {
   const [ip, setIp] = useState(serverIP || '');
   const [dnsPtr, setDnsPtr] = useState('');
 
@@ -14,7 +13,7 @@ function RdnsModal({ visible, onCancel, onSubmit, loading, serverIP }) {
   return (
     <Modal
       title="Change Reverse DNS"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText="Update rDNS"

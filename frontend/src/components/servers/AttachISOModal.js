@@ -4,7 +4,7 @@ import * as serverService from '../../api/services/serverService';
 
 const { Search } = Input;
 
-function AttachISOModal({ visible, onCancel, onSubmit, projectId }) {
+function AttachISOModal({ open, onCancel, onSubmit, projectId }) {
   const [form] = Form.useForm();
   const [isos, setISOs] = useState([]);
   const [filteredISOs, setFilteredISOs] = useState([]);
@@ -13,10 +13,10 @@ function AttachISOModal({ visible, onCancel, onSubmit, projectId }) {
   const [searchText, setSearchText] = useState('');
 
   useEffect(() => {
-    if (visible && projectId) {
+    if (open && projectId) {
       fetchISOs();
     }
-  }, [visible, projectId]);
+  }, [open, projectId]);
 
   useEffect(() => {
     if (searchText) {
@@ -60,7 +60,7 @@ function AttachISOModal({ visible, onCancel, onSubmit, projectId }) {
   return (
     <Modal
       title="Attach ISO"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText="Attach"

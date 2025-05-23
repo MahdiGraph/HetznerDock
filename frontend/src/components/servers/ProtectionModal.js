@@ -1,14 +1,21 @@
-// src/components/servers/ProtectionModal.js را اصلاح کنید
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, Form, Checkbox, Alert, Space, Typography } from 'antd';
 import { SafetyOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
-function ProtectionModal({ visible, onCancel, onSubmit, loading, isEnable = true, currentProtection = {} }) {
+function ProtectionModal({ open, onCancel, onSubmit, loading, isEnable = true, currentProtection = {} }) {
   const [form] = Form.useForm();
   const [deleteProtection, setDeleteProtection] = useState(currentProtection.delete || false);
   const [rebuildProtection, setRebuildProtection] = useState(currentProtection.rebuild || false);
+
+  // Reset checkboxes each time the modal is opened with new data
+  useEffect(() => {
+    if (open) {
+      setDeleteProtection(currentProtection.delete || false);
+      setRebuildProtection(currentProtection.rebuild || false);
+    }
+  }, [open, currentProtection]);
 
   const handleSubmit = () => {
     onSubmit({
@@ -20,7 +27,7 @@ function ProtectionModal({ visible, onCancel, onSubmit, loading, isEnable = true
   return (
     <Modal
       title={`${isEnable ? 'Enable' : 'Disable'} Server Protection`}
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText={isEnable ? "Enable Protection" : "Disable Protection"}

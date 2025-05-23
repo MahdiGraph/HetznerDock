@@ -363,6 +363,24 @@ function ServerDetailPanel({ projectId, serverId }) {
   };
 
   // منوی آیتم‌ها را به صورت آرایه‌ای از آبجکت‌ها تعریف می‌کنیم
+  let protectionItems;
+  if (server.protection?.delete || server.protection?.rebuild) {
+    protectionItems = [
+      {
+        key: 'disable_protection',
+        icon: <SafetyOutlined />,
+        label: 'Disable Protection',
+      }
+    ];
+  } else {
+    protectionItems = [
+      {
+        key: 'enable_protection',
+        icon: <SafetyOutlined />,
+        label: 'Enable Protection',
+      }
+    ];
+  }
   const menuItems = [
     {
       key: 'rename',
@@ -382,16 +400,7 @@ function ServerDetailPanel({ projectId, serverId }) {
     {
       type: 'divider',
     },
-    {
-      key: 'enable_protection',
-      icon: <SafetyOutlined />,
-      label: 'Enable Protection',
-    },
-    {
-      key: 'disable_protection',
-      icon: <SafetyOutlined />,
-      label: 'Disable Protection',
-    },
+    ...protectionItems,
     {
       type: 'divider',
     },

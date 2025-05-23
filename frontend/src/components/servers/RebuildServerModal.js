@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Form, Select, Alert, Spin, message } from 'antd';
 import * as serverService from '../../api/services/serverService';
 
-function RebuildServerModal({ visible, onCancel, onSubmit, projectId }) {
+function RebuildServerModal({ open, onCancel, onSubmit, projectId }) {
   const [form] = Form.useForm();
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (visible && projectId) {
+    if (open && projectId) {
       fetchImages();
     }
-  }, [visible, projectId]);
+  }, [open, projectId]);
 
   const fetchImages = async () => {
     try {
@@ -44,7 +44,7 @@ function RebuildServerModal({ visible, onCancel, onSubmit, projectId }) {
   return (
     <Modal
       title="Rebuild Server"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText="Rebuild"

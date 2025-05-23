@@ -1,10 +1,9 @@
-// src/components/servers/CreateImageModal.js
 import React, { useState } from 'react';
 import { Modal, Form, Input, Radio, Alert } from 'antd';
 
 const { TextArea } = Input;
 
-function CreateImageModal({ visible, onCancel, onSubmit, loading }) {
+function CreateImageModal({ open, onCancel, onSubmit, loading }) {
   const [imageType, setImageType] = useState('snapshot');
   const [description, setDescription] = useState('');
 
@@ -18,7 +17,7 @@ function CreateImageModal({ visible, onCancel, onSubmit, loading }) {
   return (
     <Modal
       title="Create Image"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText="Create Image"

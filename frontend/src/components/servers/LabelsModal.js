@@ -1,18 +1,17 @@
-// src/components/servers/LabelsModal.js
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Button, Space, Divider, Tag } from 'antd';
 import { PlusOutlined, TagOutlined } from '@ant-design/icons';
 
-function LabelsModal({ visible, onCancel, onSubmit, loading, initialLabels = {} }) {
+function LabelsModal({ open, onCancel, onSubmit, loading, initialLabels = {} }) {
   const [labels, setLabels] = useState({});
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
 
   useEffect(() => {
-    if (visible) {
+    if (open) {
       setLabels(initialLabels || {});
     }
-  }, [visible, initialLabels]);
+  }, [open, initialLabels]);
 
   const handleAddLabel = () => {
     if (newKey && newValue) {
@@ -39,7 +38,7 @@ function LabelsModal({ visible, onCancel, onSubmit, loading, initialLabels = {} 
   return (
     <Modal
       title="Manage Server Labels"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
       okText="Save Labels"

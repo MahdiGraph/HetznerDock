@@ -470,12 +470,17 @@ def get_server(
         return {
             "id": server.id,
             "name": server.name,
-            "status": server.status.lower(),  # Normalize status
+            "status": server.status.lower(),
             "ip": server.public_net.ipv4.ip if server.public_net and server.public_net.ipv4 else None,
             "location": server.datacenter.location.name if server.datacenter and server.datacenter.location else None,
             "server_type": server.server_type.name if server.server_type else None,
             "image": server.image.name if server.image else None,
-            "created": server.created.isoformat() if server.created else None
+            "created": server.created.isoformat() if server.created else None,
+            "labels": server.labels if hasattr(server, "labels") else {},
+            "protection": {
+                "delete": server.protection.delete if hasattr(server, "protection") else False,
+                "rebuild": server.protection.rebuild if hasattr(server, "protection") else False
+            }
         }
     except Exception as e:
         # Log error

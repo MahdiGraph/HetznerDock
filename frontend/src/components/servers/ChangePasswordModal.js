@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Form, Input, Button, Alert, message } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
 
-function ChangePasswordModal({ visible, onCancel, onSubmit, loading }) {
+function ChangePasswordModal({ open, onCancel, onSubmit, loading }) {
   const [form] = Form.useForm();
 
   const handleSubmit = () => {
@@ -18,7 +18,7 @@ function ChangePasswordModal({ visible, onCancel, onSubmit, loading }) {
   return (
     <Modal
       title="Change Server Password"
-      open={visible}
+      open={open}
       onCancel={onCancel}
       footer={[
         <Button key="back" onClick={onCancel}>

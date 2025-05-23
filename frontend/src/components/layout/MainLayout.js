@@ -67,7 +67,7 @@ function MainLayout() {
       </Layout>
       
       <ChangePasswordModal 
-        visible={changePasswordVisible}
+        open={changePasswordVisible}
         onCancel={() => setChangePasswordVisible(false)}
       />
     </Layout>
