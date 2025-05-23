@@ -402,10 +402,10 @@ function ServerDetailPanel({ projectId, serverId }) {
     {
       type: 'divider',
     },
-    ...protectionItems,
+    /*...protectionItems,
     {
       type: 'divider',
-    },
+    },*/
     {
       key: 'rdns',
       icon: <GlobalOutlined />,
