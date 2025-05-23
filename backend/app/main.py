@@ -52,6 +52,12 @@ async def startup_event():
 
 # Get frontend build path
 frontend_path = Path("../frontend/build")
+novnc_path = Path("../frontend/public/novnc")  # مسیر فایل‌های noVNC
+
+# Serve noVNC files separately - اضافه کردن این بخش
+if novnc_path.exists():
+    app.mount("/novnc", StaticFiles(directory=novnc_path), name="novnc")
+
 if frontend_path.exists():
     # Serve static files (React frontend)
     app.mount("/static", StaticFiles(directory=frontend_path / "static"), name="static")
@@ -61,7 +67,9 @@ if frontend_path.exists():
     async def serve_react(full_path: str):
         if full_path.startswith("api/"):
             return {"detail": "API endpoint not found"}
-        
+        # Exclude novnc paths from React handling
+        if full_path.startswith("novnc/"):
+            return {"detail": "Not found"}
         return FileResponse(frontend_path / "index.html")
 else:
     # In case frontend is not built yet
@@ -69,7 +77,6 @@ else:
     async def serve_not_found(full_path: str):
         if full_path.startswith("api/"):
             return {"detail": "API endpoint not found"}
-        
         return {"message": "Frontend not built yet. Please run 'npm run build' in the frontend directory."}
 
 if __name__ == "__main__":
