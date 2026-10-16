@@ -21,7 +21,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci --no-audit --no-fund
+      # Like the Dockerfile: fetch from the public registry even if the lockfile names a local mirror.
+      - run: npm ci --no-audit --no-fund --registry=https://registry.npmjs.org/ --replace-registry-host=always
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
