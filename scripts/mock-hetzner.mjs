@@ -1,14 +1,19 @@
 #!/usr/bin/env node
-// A fake Hetzner Cloud API for trying Hetzner Dock without a real project.
+// A fake Hetzner Cloud API for trying Hetzner Dock without a real project, and
+// under /robot a fake Hetzner Robot webservice for dedicated servers.
 //
 //   npm run mock            (listens on http://localhost:4010)
 //
 // Then, in the panel: Settings → API address → http://localhost:4010/v1, and add
 // one of the tokens printed at start as a project. Servers, actions, images,
 // metrics, firewalls and a small VNC console behave like the real API, closely
-// enough to click through every screen. Everything is kept in memory.
+// enough to click through every screen. For dedicated servers, set Settings →
+// Robot accounts → Webservice address to http://localhost:4010/robot and add a
+// webservice user printed at start (see mock-robot.mjs). Everything is kept in
+// memory.
 import crypto from "node:crypto"
 import http from "node:http"
+import { handleRobot, ROBOT_USERS } from "./mock-robot.mjs"
 
 const PORT = Number(process.env.MOCK_PORT || 4010)
 const HOST = process.env.MOCK_HOST || "127.0.0.1"
@@ -526,6 +531,7 @@ function metrics(server, type, start, end) {
 
 async function handle(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`)
+  if (url.pathname === "/robot" || url.pathname.startsWith("/robot/")) return handleRobot(req, res, url)
   if (!url.pathname.startsWith("/v1/")) return error(res, 404, "not_found", "not found")
   const token = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "")
   const project = TOKENS[token]
@@ -1112,4 +1118,7 @@ httpServer.listen(PORT, HOST, () => {
   console.log(`Mock Hetzner Cloud API on http://${HOST}:${PORT}/v1`)
   console.log("Tokens (each one is a project):")
   for (const [token, project] of Object.entries(TOKENS)) console.log(`  ${project.padEnd(10)} ${token}`)
+  console.log(`Mock Hetzner Robot webservice on http://${HOST}:${PORT}/robot`)
+  console.log("Webservice users (each one is a Robot account), with their passwords:")
+  for (const [user, { password, account }] of Object.entries(ROBOT_USERS)) console.log(`  ${account.padEnd(10)} ${user}  ${password}`)
 })

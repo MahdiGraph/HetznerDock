@@ -13,7 +13,7 @@ export default async function AdminPage() {
     .prepare("SELECT COUNT(*) AS total, COALESCE(SUM(role = 'admin'), 0) AS admins, COALESCE(SUM(disabled), 0) AS disabled FROM users")
     .get() as { total: number; admins: number; disabled: number }
   const assignments = db()
-    .prepare("SELECT COUNT(*) AS total, COUNT(DISTINCT project_id || ':' || server_id) AS servers FROM assignments")
+    .prepare("SELECT COUNT(*) AS total, COUNT(DISTINCT kind || ':' || project_id || ':' || server_id) AS servers FROM assignments")
     .get() as { total: number; servers: number }
   // Server actions only; sign-ins and settings changes are on the Activity page.
   const recent = db()

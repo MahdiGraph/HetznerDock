@@ -46,6 +46,38 @@ export function inIPv6Network(address: string, network: string): boolean {
   return a >> shift === b >> shift
 }
 
+/** The usual short form of an IPv6 address: lower case, the longest run of zero groups as "::". */
+export function compactIPv6(value: string): string | null {
+  const n = parseIPv6(value)
+  if (n === null) return null
+  const groups = Array.from({ length: 8 }, (_, i) => Number((n >> BigInt(112 - i * 16)) & BigInt(0xffff)))
+  let best = { at: -1, length: 1 }
+  for (let i = 0; i < 8; ) {
+    let j = i
+    while (j < 8 && groups[j] === 0) j++
+    if (j - i > best.length) best = { at: i, length: j - i }
+    i = j === i ? i + 1 : j
+  }
+  const hex = groups.map((g) => g.toString(16))
+  if (best.at < 0) return hex.join(":")
+  return `${hex.slice(0, best.at).join(":")}::${hex.slice(best.at + best.length).join(":")}`
+}
+
+function ipv4Number(value: string): number | null {
+  return isIPv4(value) ? value.split(".").reduce((n, part) => n * 256 + Number(part), 0) : null
+}
+
+/** Whether an IPv4 address lies inside a network such as 203.0.113.16/29. */
+export function inIPv4Network(address: string, network: string): boolean {
+  const [base, bits] = network.split("/")
+  const prefix = Number(bits ?? 32)
+  const a = ipv4Number(address)
+  const b = ipv4Number(base)
+  if (a === null || b === null || !Number.isInteger(prefix) || prefix < 0 || prefix > 32) return false
+  const size = 2 ** (32 - prefix)
+  return Math.floor(a / size) === Math.floor(b / size)
+}
+
 /** A host name as reverse DNS needs it: labels of letters, digits and dashes, dots between. */
 export function isHostname(value: string): boolean {
   if (value.length < 1 || value.length > 253) return false

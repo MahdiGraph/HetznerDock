@@ -1,9 +1,17 @@
 import { z } from "zod"
 import { clientIp, json, readJson, requireApiAdmin, route } from "@/lib/http"
-import { getPermissions, getProxySettings, publicSettings, saveBaseUrl, savePermissions, saveProxySettings } from "@/lib/settings"
+import {
+  getPermissions,
+  getProxySettings,
+  publicSettings,
+  saveBaseUrl,
+  savePermissions,
+  saveProxySettings,
+  saveRobotUrl,
+} from "@/lib/settings"
 import { PERMISSION_KEYS, PERMISSION_META } from "@/lib/permissions"
 import { audit } from "@/lib/audit"
-import { HetznerInput, PermissionsInput, ProxyInput } from "@/lib/schemas"
+import { HetznerInput, PermissionsInput, ProxyInput, RobotInput } from "@/lib/schemas"
 
 export const GET = route(async (req) => {
   requireApiAdmin(req)
@@ -12,6 +20,7 @@ export const GET = route(async (req) => {
 
 const Body = z.object({
   hetzner: HetznerInput.optional(),
+  robot: RobotInput.optional(),
   proxy: ProxyInput.optional(),
   permissions: PermissionsInput.optional(),
 })
@@ -23,6 +32,10 @@ export const PUT = route(async (req) => {
   if (body.hetzner) {
     saveBaseUrl(body.hetzner.baseUrl)
     audit({ user: admin, action: `Set the Hetzner API address to ${body.hetzner.baseUrl}`, ip, status: 200 })
+  }
+  if (body.robot) {
+    saveRobotUrl(body.robot.baseUrl)
+    audit({ user: admin, action: `Set the Robot webservice address to ${body.robot.baseUrl}`, ip, status: 200 })
   }
   if (body.proxy) {
     const p = body.proxy

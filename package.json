@@ -1,7 +1,7 @@
 {
   "name": "hetzner-dock",
   "version": "2.0.0",
-  "description": "Self-hosted control panel for sharing Hetzner Cloud servers with customers, friends and teams.",
+  "description": "Self-hosted control panel for sharing Hetzner Cloud and dedicated servers with customers, friends and teams.",
   "private": true,
   "license": "MIT",
   "homepage": "https://github.com/MahdiGraph/HetznerDock#readme",
@@ -15,6 +15,8 @@
   "keywords": [
     "hetzner",
     "hetzner-cloud",
+    "hetzner-robot",
+    "dedicated-server",
     "hcloud",
     "control-panel",
     "vps",

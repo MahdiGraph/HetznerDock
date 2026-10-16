@@ -1,5 +1,7 @@
 /** Browser-side helpers for talking to the panel's own API. */
 
+import type { ServerKind } from "./summary"
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -45,9 +47,9 @@ function qs(query?: Query) {
   return s ? `?${s}` : ""
 }
 
-/** Address of a server page in the panel. */
-export function serverHref(project: number, id: number) {
-  return `/servers/${project}/${id}`
+/** Address of a server page in the panel; for a dedicated server, project is its Robot account. */
+export function serverHref(kind: ServerKind, project: number, id: number) {
+  return kind === "dedicated" ? `/servers/dedicated/${project}/${id}` : `/servers/${project}/${id}`
 }
 
 /** Address of the full-window console of a server. */
@@ -68,6 +70,21 @@ export function hzCall<T = unknown>(
   body?: unknown
 ) {
   return api<T>(hzUrl(project, id, sub), { method, body })
+}
+
+/** A call for one dedicated server (a Robot account and a server number) through the panel's gateway. */
+export function robotUrl(account: number, number: number, sub = "", query?: Query) {
+  return `/api/hz/dedicated/${account}/${number}${sub ? `/${sub}` : ""}${qs(query)}`
+}
+
+export function robotCall<T = unknown>(
+  account: number,
+  number: number,
+  method: "GET" | "POST" | "PUT" | "DELETE",
+  sub = "",
+  body?: unknown
+) {
+  return api<T>(robotUrl(account, number, sub), { method, body })
 }
 
 export function errorMessage(e: unknown) {

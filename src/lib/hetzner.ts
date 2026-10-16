@@ -7,7 +7,8 @@ import { projectToken } from "./projects"
 import { getBaseUrl, getProxySettings, type ProxySettings } from "./settings"
 
 /**
- * Every request to the Hetzner Cloud API goes through this module. When the proxy
+ * Every request to Hetzner goes through this module: the Cloud API client below,
+ * and through `send` also the Robot webservice client in robot.ts. When the proxy
  * is enabled the request is sent through it and only through it: there is no
  * direct fallback, so a broken proxy fails loudly instead of leaking traffic.
  */
@@ -102,8 +103,8 @@ function isLoopback(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1"
 }
 
-function networkMessage(err: NodeJS.ErrnoException, proxy: ProxySettings): string {
-  const where = proxy.enabled ? `the ${proxy.protocol.toUpperCase()} proxy at ${proxy.host}:${proxy.port}` : "the Hetzner API"
+function networkMessage(err: NodeJS.ErrnoException, proxy: ProxySettings, target: string): string {
+  const where = proxy.enabled ? `the ${proxy.protocol.toUpperCase()} proxy at ${proxy.host}:${proxy.port}` : target
   const code = err.code ?? ""
   const text = err.message ?? ""
   if (code === "ECONNREFUSED" || text.includes("ECONNREFUSED")) return `Connection refused by ${where}.`
@@ -177,7 +178,8 @@ function errorFromResponse(status: number, data: unknown, headers: http.Incoming
   return new HetznerError(status, said ?? fallback, extra)
 }
 
-function buildUrl(baseUrl: string, path: string, query?: Query) {
+/** A request address below an API's base URL: https, or plain http to this machine only. */
+export function buildUrl(baseUrl: string, path: string, query?: Query) {
   const url = new URL(baseUrl.replace(/\/+$/, "") + path)
   if (url.protocol !== "https:" && !(url.protocol === "http:" && isLoopback(url.hostname))) {
     throw new HetznerError(500, "The API address must use https.")
@@ -190,6 +192,77 @@ function buildUrl(baseUrl: string, path: string, query?: Query) {
     }
   }
   return url
+}
+
+export type Outbound = {
+  url: URL
+  method: string
+  headers: Record<string, string>
+  body?: Buffer
+  timeoutMs?: number
+  proxy: ProxySettings
+  /** A connection of its own, closed afterwards: for testing values that are not saved yet. */
+  oneOff?: boolean
+  /** Who network errors name when there is no proxy, e.g. "the Hetzner API". */
+  target: string
+}
+
+export type RawResponse = { status: number; headers: http.IncomingHttpHeaders; text: string }
+
+/** Sends one request the way the proxy settings say and returns the answer, whatever its status. */
+export async function send(o: Outbound): Promise<RawResponse> {
+  const local = o.url.protocol === "http:"
+  const agent = local ? new http.Agent() : o.oneOff ? createAgent(o.proxy) : sharedAgent(o.proxy)
+  const viaProxy = local ? { ...o.proxy, enabled: false } : o.proxy
+  const request = local ? http.request : https.request
+
+  try {
+    return await new Promise<RawResponse>((resolve, reject) => {
+      const req = request(
+        o.url,
+        {
+          method: o.method,
+          agent,
+          timeout: o.timeoutMs ?? 30_000,
+          headers: {
+            "User-Agent": `HetznerDock/${APP_VERSION}`,
+            ...o.headers,
+            ...(o.body ? { "Content-Length": o.body.length } : {}),
+          },
+        },
+        (res) => {
+          const chunks: Buffer[] = []
+          res.on("data", (c: Buffer) => chunks.push(c))
+          res.on("error", (err) => reject(new HetznerError(502, networkMessage(err, viaProxy, o.target))))
+          res.on("end", () =>
+            resolve({ status: res.statusCode ?? 0, headers: res.headers, text: Buffer.concat(chunks).toString("utf8") })
+          )
+        }
+      )
+      req.on("timeout", () => {
+        const err = new Error("timeout") as NodeJS.ErrnoException
+        err.code = "ETIMEDOUT"
+        req.destroy(err)
+      })
+      req.on("error", (err: NodeJS.ErrnoException) => {
+        reject(err instanceof HetznerError ? err : new HetznerError(502, networkMessage(err, viaProxy, o.target)))
+      })
+      if (o.body) req.write(o.body)
+      req.end()
+    })
+  } finally {
+    if (o.oneOff || local) agent.destroy()
+  }
+}
+
+/** The answer as JSON, or the start of its text when it is not JSON. */
+export function parseBody(text: string): unknown {
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { raw: text.slice(0, 2000) }
+  }
 }
 
 export async function hzRequest<T = unknown>(req: HzRequest): Promise<HzResponse<T>> {
@@ -205,64 +278,25 @@ export async function hzRequest<T = unknown>(req: HzRequest): Promise<HzResponse
     )
   }
 
-  const url = buildUrl(baseUrl, req.path, req.query)
-  const local = url.protocol === "http:"
-  const agent = local ? new http.Agent() : req.override ? createAgent(proxy) : sharedAgent(proxy)
-  const viaProxy = local ? { ...proxy, enabled: false } : proxy
-  const payload = req.body === undefined ? undefined : Buffer.from(JSON.stringify(req.body))
-  const method = req.method ?? "GET"
-  const send = local ? http.request : https.request
-
-  try {
-    return await new Promise<HzResponse<T>>((resolve, reject) => {
-      const request = send(
-        url,
-        {
-          method,
-          agent,
-          timeout: req.timeoutMs ?? 30_000,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            "User-Agent": `HetznerDock/${APP_VERSION}`,
-            ...(payload ? { "Content-Type": "application/json", "Content-Length": payload.length } : {}),
-          },
-        },
-        (res) => {
-          const chunks: Buffer[] = []
-          res.on("data", (c: Buffer) => chunks.push(c))
-          res.on("error", (err) => reject(new HetznerError(502, networkMessage(err, viaProxy))))
-          res.on("end", () => {
-            if (!req.override) recordRateLimit(req.projectId, res.headers)
-            const text = Buffer.concat(chunks).toString("utf8")
-            let data: unknown = null
-            if (text) {
-              try {
-                data = JSON.parse(text)
-              } catch {
-                data = { raw: text.slice(0, 2000) }
-              }
-            }
-            const status = res.statusCode ?? 0
-            if (status >= 400) reject(errorFromResponse(status, data, res.headers))
-            else resolve({ status, data: data as T })
-          })
-        }
-      )
-      request.on("timeout", () => {
-        const err = new Error("timeout") as NodeJS.ErrnoException
-        err.code = "ETIMEDOUT"
-        request.destroy(err)
-      })
-      request.on("error", (err: NodeJS.ErrnoException) => {
-        reject(err instanceof HetznerError ? err : new HetznerError(502, networkMessage(err, viaProxy)))
-      })
-      if (payload) request.write(payload)
-      request.end()
-    })
-  } finally {
-    if (req.override || local) agent.destroy()
-  }
+  const body = req.body === undefined ? undefined : Buffer.from(JSON.stringify(req.body))
+  const res = await send({
+    url: buildUrl(baseUrl, req.path, req.query),
+    method: req.method ?? "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    body,
+    timeoutMs: req.timeoutMs,
+    proxy,
+    oneOff: !!req.override,
+    target: "the Hetzner API",
+  })
+  if (!req.override) recordRateLimit(req.projectId, res.headers)
+  const data = parseBody(res.text)
+  if (res.status >= 400) throw errorFromResponse(res.status, data, res.headers)
+  return { status: res.status, data: data as T }
 }
 
 /** Follows page/per_page pagination and returns every item of a list endpoint. */

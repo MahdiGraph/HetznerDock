@@ -138,7 +138,7 @@ export function ConsoleView({ project, id, name, allowed }: { project: number; i
   return (
     <div ref={frame} className="flex h-svh flex-col bg-background">
       <header className="flex h-14 shrink-0 items-center gap-2 bg-card px-3 md:px-4">
-        <Link href={serverHref(project, id)} className="flex min-w-0 items-center gap-2.5 outline-none" aria-label="Back to the server">
+        <Link href={serverHref("cloud", project, id)} className="flex min-w-0 items-center gap-2.5 outline-none" aria-label="Back to the server">
           <ArrowLeftIcon className="size-4 shrink-0 text-muted-foreground" />
           <LogoMark className="size-6 shrink-0" />
           <span className="truncate text-sm font-medium">{name ?? `Server ${id}`}</span>

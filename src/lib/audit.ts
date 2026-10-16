@@ -1,11 +1,14 @@
 import { db } from "./db"
 import type { User } from "./auth"
+import type { ServerKind } from "./summary"
 
 const MAX_ROWS = 20_000
 
 export function audit(entry: {
   user: Pick<User, "id" | "username"> | null
   action: string
+  /** The kind of the server the entry is about; projectId is a Robot account for dedicated servers. */
+  kind?: ServerKind
   projectId?: number | null
   serverId?: number | null
   serverName?: string | null
@@ -16,8 +19,8 @@ export function audit(entry: {
   try {
     db()
       .prepare(
-        `INSERT INTO audit_logs (at, user_id, username, action, project_id, server_id, server_name, detail, status, ip)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO audit_logs (at, user_id, username, action, project_id, server_kind, server_id, server_name, detail, status, ip)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         Date.now(),
@@ -25,6 +28,7 @@ export function audit(entry: {
         entry.user?.username ?? null,
         entry.action,
         entry.projectId ?? null,
+        entry.serverId ? (entry.kind ?? "cloud") : null,
         entry.serverId ?? null,
         entry.serverName ?? null,
         entry.detail ?? null,
@@ -49,6 +53,7 @@ export type AuditRow = {
   username: string | null
   action: string
   project_id: number | null
+  server_kind: ServerKind | null
   server_id: number | null
   server_name: string | null
   detail: string | null

@@ -17,9 +17,24 @@ export const SERVER_STATUSES = [
 /** Statuses a server passes through on its own; the page polls while it is in one. */
 export const TRANSITIONAL = ["initializing", "starting", "stopping", "deleting", "migrating", "rebuilding"]
 
+/**
+ * Cloud servers come from a Hetzner Cloud project, dedicated servers from a Robot
+ * account. A dedicated server's number can equal a cloud server's ID, so a server
+ * is always named by its kind, its project or account, and its ID.
+ */
+export const SERVER_KINDS = ["cloud", "dedicated"] as const
+export type ServerKind = (typeof SERVER_KINDS)[number]
+
+/** A server's key in maps and lists, "dedicated:2:1234567". */
+export function serverKey(kind: ServerKind, projectId: number, serverId: number) {
+  return `${kind}:${projectId}:${serverId}`
+}
+
 export type ServerSummary = {
+  kind: ServerKind
+  /** The cloud server's ID, or the dedicated server's number. */
   id: number
-  /** The Hetzner Cloud project (API token) the server belongs to. */
+  /** The Hetzner Cloud project (API token) the server belongs to, or for a dedicated server its Robot account. */
   projectId: number
   projectName: string
   /** The server's name at Hetzner. */
@@ -41,8 +56,10 @@ export type ServerSummary = {
   created: string | null
   traffic: { out: number | null; in: number | null; included: number | null }
   rescue: boolean
-  /** Monthly price including VAT, only filled in for admins. */
+  /** Monthly price including VAT, only filled in for admins. Robot does not report one for dedicated servers. */
   price?: number | null
+  /** Whether a dedicated server is cancelled at Hetzner, only filled in for admins. */
+  cancelled?: boolean
 }
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null)
@@ -106,6 +123,7 @@ export function summarize(raw: Dict, project: { id: number; name: string }, opts
   const city = str(loc.city)
   const name = str(loc.name)
   return {
+    kind: "cloud",
     id: Number(raw.id),
     projectId: project.id,
     projectName: project.name,

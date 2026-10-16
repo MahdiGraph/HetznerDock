@@ -15,7 +15,7 @@ export function listProjects() {
   const rows = db()
     .prepare(
       `SELECT id, name, token, created_at, updated_at,
-         (SELECT COUNT(*) FROM assignments WHERE project_id = projects.id) AS assignments
+         (SELECT COUNT(*) FROM assignments WHERE kind = 'cloud' AND project_id = projects.id) AS assignments
        FROM projects ORDER BY name COLLATE NOCASE, id`
     )
     .all() as Row[]
@@ -59,11 +59,14 @@ export function updateProject(id: number, patch: { name?: string; token?: string
   if (patch.token) db().prepare("UPDATE projects SET token = ?, updated_at = ? WHERE id = ?").run(encrypt(patch.token), now, id)
 }
 
-/** Deletes the project and, through the foreign key, every assignment of its servers. */
+/** Deletes the project and every assignment of its servers. */
 export function deleteProject(id: number) {
-  db().prepare("DELETE FROM projects WHERE id = ?").run(id)
+  db().transaction(() => {
+    db().prepare("DELETE FROM assignments WHERE kind = 'cloud' AND project_id = ?").run(id)
+    db().prepare("DELETE FROM projects WHERE id = ?").run(id)
+  })()
 }
 
 export function assignmentCount(id: number): number {
-  return (db().prepare("SELECT COUNT(*) AS n FROM assignments WHERE project_id = ?").get(id) as { n: number }).n
+  return (db().prepare("SELECT COUNT(*) AS n FROM assignments WHERE kind = 'cloud' AND project_id = ?").get(id) as { n: number }).n
 }

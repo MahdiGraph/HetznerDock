@@ -1,6 +1,6 @@
 # Security policy
 
-Hetzner Dock holds Hetzner Cloud API tokens that can power off, rebuild and wipe servers, so security reports are taken seriously.
+Hetzner Dock holds Hetzner Cloud API tokens and Hetzner Robot webservice passwords that can power off, reset, reinstall and wipe servers, so security reports are taken seriously.
 
 ## Reporting a vulnerability
 
@@ -28,4 +28,5 @@ HetznerDock 1.x is no longer maintained. Version 2 is a rewrite; move to it.
 - Give each person their own user account and remove accounts that are no longer needed.
 - Turn off under *Settings → What users can do* whatever your users do not need.
 - Use a separate Hetzner project for the servers you share, so a token can only reach those servers.
+- Give the panel a Robot webservice user of its own, so you can change or revoke its password in Robot without touching your other tools.
 - Keep `APP_SECRET` (in `/opt/hetzner-dock/.env`) private and back it up together with the database.

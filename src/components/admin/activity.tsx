@@ -89,7 +89,7 @@ export function ActivityLog() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       {r.server_id && r.project_id ? (
-                        <Link href={serverHref(r.project_id, r.server_id)} className="hover:underline">
+                        <Link href={serverHref(r.server_kind ?? "cloud", r.project_id, r.server_id)} className="hover:underline">
                           {r.server_name ?? `Server ${r.server_id}`}
                           <span className="text-muted-foreground tabular"> · #{r.server_id}</span>
                         </Link>

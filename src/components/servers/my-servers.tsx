@@ -8,6 +8,7 @@ import { Flag } from "@/components/flag"
 import { useApi } from "@/hooks/use-api"
 import { serverHref } from "@/lib/client"
 import type { UserServer } from "@/lib/servers"
+import { serverKey } from "@/lib/summary"
 
 export function MyServers({ name }: { name: string }) {
   const { data, error, isLoading } = useApi<{ servers: UserServer[] }>("/api/servers", { refreshInterval: 60_000 })
@@ -36,13 +37,16 @@ export function MyServers({ name }: { name: string }) {
       ) : (
         <ul className="grid gap-2">
           {servers.map((s) => (
-            <li key={`${s.projectId}:${s.id}`}>
+            <li key={serverKey(s.kind, s.projectId, s.id)}>
               <Link
-                href={serverHref(s.projectId, s.id)}
+                href={serverHref(s.kind, s.projectId, s.id)}
                 className="group grid grid-cols-12 items-center gap-x-4 gap-y-2 bg-card p-5 transition-colors outline-none hover:bg-accent focus-visible:bg-accent md:p-6"
               >
                 <div className="col-span-12 min-w-0 md:col-span-4">
-                  <p className="text-[13px] text-muted-foreground">{s.type ? `Cloud server ${s.type}` : "Cloud server"}</p>
+                  <p className="text-[13px] text-muted-foreground">
+                    {s.kind === "dedicated" ? "Dedicated server" : "Cloud server"}
+                    {s.type ? ` ${s.type}` : ""}
+                  </p>
                   <p className="display mt-1 truncate text-2xl md:text-3xl">{s.name}</p>
                 </div>
                 {s.error ? (
@@ -61,7 +65,7 @@ export function MyServers({ name }: { name: string }) {
                       </p>
                     </div>
                     <div className="col-span-9 min-w-0 md:col-span-3">
-                      <p className="text-[13px] text-muted-foreground">{s.os ?? "System"}</p>
+                      <p className="text-[13px] text-muted-foreground">{s.kind === "dedicated" ? "Status" : (s.os ?? "System")}</p>
                       <StateMark state={s.status} className="mt-1 text-base" label={s.rescue ? "Rescue mode on" : undefined} />
                     </div>
                   </>

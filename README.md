@@ -4,9 +4,9 @@
 
 # Hetzner Dock
 
-**A self-hosted control panel for sharing Hetzner Cloud servers with your customers, friends and team.**
+**A self-hosted control panel for sharing Hetzner Cloud and dedicated servers with your customers, friends and team.**
 
-Everyone gets their own login to restart, rebuild, rescue and watch *their* cloud servers, with the console right in the browser. Nobody needs your Hetzner account.
+Everyone gets their own login to restart, rebuild, rescue and watch *their* servers, cloud servers with the console right in the browser and dedicated servers from Hetzner Robot. Nobody needs your Hetzner account.
 
 [![Release](https://img.shields.io/github/v/release/MahdiGraph/HetznerDock?style=flat-square&color=85aed0)](https://github.com/MahdiGraph/HetznerDock/releases)
 [![Docker image](https://img.shields.io/github/actions/workflow/status/MahdiGraph/HetznerDock/docker.yml?branch=main&style=flat-square&label=docker%20image)](https://github.com/MahdiGraph/HetznerDock/actions/workflows/docker.yml)
@@ -27,9 +27,9 @@ Everyone gets their own login to restart, rebuild, rescue and watch *their* clou
 
 ## Why it exists
 
-If you rent Hetzner Cloud servers for other people, you know the routine. A server stops answering and its owner messages you to reboot it. Someone locked themselves out over SSH and needs the console, a fresh Ubuntu, a reverse DNS record or a new root password, and every time it waits for you. Hetzner grants access per project, so letting someone in means letting them see and change every server in it.
+If you rent Hetzner servers for other people, you know the routine. A server stops answering and its owner messages you to reboot it. Someone locked themselves out over SSH and needs the console, a fresh Ubuntu, a reverse DNS record or a new root password, and every time it waits for you. Hetzner grants access per Cloud project or per Robot account, so letting someone in means letting them see and change every server in it.
 
-**Hetzner Dock** is a small web panel you run on any Linux box. You add the API token of each Hetzner Cloud project once, create a login for each person and assign them their servers. From then on they look after their own servers, and you see everything they do in the activity log.
+**Hetzner Dock** is a small web panel you run on any Linux box. You add the API token of each Hetzner Cloud project and the webservice user of each Robot account once, create a login for each person and assign them their servers. From then on they look after their own servers, and you see everything they do in the activity log.
 
 ## Features
 
@@ -47,16 +47,27 @@ If you rent Hetzner Cloud servers for other people, you know the routine. A serv
 - **History**: everything Hetzner did on the server, with live progress while an action runs.
 - **Their own names**: each user can rename a server for themselves. Its name at Hetzner stays as it is.
 
+### Dedicated servers from Hetzner Robot
+
+The same page, with what the [Robot webservice](https://robot.hetzner.com/doc/webservice/en.html) offers:
+
+- **Resets**: Ctrl+Alt+Del, a hardware reset, the power button pressed or held, or a reset by a Hetzner technician, whichever the server supports, plus **Wake on LAN** and the power state where Robot reports it.
+- **Rescue**: boot the Linux rescue system or vKVM for the next start, with an SSH key or a root password shown once, and reset into it with one click.
+- **Install Linux**: wipe the disks and install any distribution Robot offers, with SSH keys, starting right away or at the next start.
+- **Network**: reverse DNS for the main IPv4 address, extra addresses, IPv4 subnets and any address of the IPv6 /64.
+- **Traffic**: incoming and outgoing traffic per hour, day or month, for all the server's addresses together.
+
 ### For you, the admin
 
 - **Several Hetzner projects**: Hetzner ties every API token to one project. Add a token for each project; servers from all of them appear in one list with their **country flags**, type, state and price.
+- **Dedicated servers too**: add a Robot webservice user for each Robot account, and its dedicated servers join the same list, with flags, product and state, ready to assign.
 - **Users and assignments**: create users, assign servers with a click, disable or reset accounts.
 - **You decide what users can do**: switch the console, rebuild, rescue, root password resets, ISOs, reverse DNS and firewall editing on or off, and set how many snapshots a user may keep per server.
 - **Overview**: what your servers cost a month, which ones are close to their included traffic, and how many of Hetzner's 3600 hourly API requests are left.
 - **Activity log**: who rebooted, rebuilt or changed what, on which server, and what Hetzner answered.
-- **Admin tools on every server**: rename it at Hetzner, turn protection and backups on or off, and change its server type.
-- **Outbound proxy**: send every API request through an **HTTP, HTTPS, SOCKS4, SOCKS5 or SOCKS5h** proxy, with no silent direct fallback. Useful when your server cannot reach the Hetzner API.
-- **Billing stays private**: users never see prices, labels or servers that are not theirs.
+- **Admin tools on every server**: rename it at Hetzner, turn protection and backups on or off, and change its server type. For dedicated servers, rename them in Robot and see when they are paid until and whether they are cancelled.
+- **Outbound proxy**: send every API request, to the Cloud API and to Robot, through an **HTTP, HTTPS, SOCKS4, SOCKS5 or SOCKS5h** proxy, with no silent direct fallback. Useful when your server cannot reach Hetzner.
+- **Billing stays private**: users never see prices, labels, contract dates or servers that are not theirs.
 - **Dark and light themes**, and a layout that works on a phone.
 - **Easy to run**: one Docker container with a SQLite database, a one-line installer for amd64 and arm64.
 
@@ -116,15 +127,16 @@ The panel listens on port 3000 and keeps its data in `./data`. Change that with 
 ## First steps
 
 1. **Settings → Hetzner projects**: add the API token of every project whose servers you want to share, for example *Customers* and *Friends*, and press **Test**. Create tokens in the [Hetzner Console](https://console.hetzner.com/): open the project, then *Security → API tokens*, and choose **Read & Write**.
-2. **Settings → What users can do**: turn off what your users should not do, and set how many snapshots they may keep.
-3. **Settings → Outbound proxy** (optional): turn it on if the panel must reach Hetzner through a proxy.
-4. **Users**: create a login for each person and send them the generated password.
-5. **Servers**: press **Assign** next to a server and tick the people who should manage it.
+2. **Settings → Robot accounts** (for dedicated servers): in [Robot](https://robot.hetzner.com/), open *Settings → Web service and app settings* and create a webservice user. Enter its user name (it looks like `#ws+AbCd1234`) and password and press **Test sign-in**. Robot blocks an address for ten minutes after three failed sign-ins, so test before you save.
+3. **Settings → What users can do**: turn off what your users should not do, and set how many snapshots they may keep.
+4. **Settings → Outbound proxy** (optional): turn it on if the panel must reach Hetzner through a proxy.
+5. **Users**: create a login for each person and send them the generated password.
+6. **Servers**: press **Assign** next to a server and tick the people who should manage it.
 
 They sign in at the same address and see only their own servers.
 
 > [!TIP]
-> Keep the servers you share in their own Hetzner project. A token can only ever reach the servers of its project, so your private servers stay out of reach even of the panel.
+> Keep the servers you share in their own Hetzner project. A token can only ever reach the servers of its project, so your private servers stay out of reach even of the panel. A Robot webservice user reaches every dedicated server of its Robot account; the panel only ever touches the ones you assign, and their own addresses.
 
 ## Screenshots
 
@@ -171,11 +183,21 @@ Everything goes through the [Hetzner Cloud API](https://docs.hetzner.cloud/) wit
 | Snapshots of this server | `create_image`, `images` | A limit per server, 0 turns them off |
 | Graphs, history, volumes, private networks | `metrics`, `actions` | No |
 
-Admins can also rename servers at Hetzner, change their protection, backups and server type. Creating and deleting servers, volumes, load balancers and other project-wide resources are deliberately left out: that is what the Hetzner Console is for.
+Dedicated servers go through the [Robot webservice](https://robot.hetzner.com/doc/webservice/en.html) with the webservice user of the server's own Robot account, under the same switches:
+
+| On the server page | Robot webservice | Can be turned off |
+| --- | --- | --- |
+| Resets (Ctrl+Alt+Del, hardware, power button, technician), Wake on LAN, power state | `reset`, `wol` | No |
+| Rescue system (Linux or vKVM), optionally with an SSH key and an instant reset | `boot/{server}/rescue` | Yes, with *Rescue mode* |
+| Linux installation | `boot/{server}/linux` | Yes, with *Rebuild* |
+| Reverse DNS of the server's own addresses and subnets | `rdns` | Yes, with *Reverse DNS* |
+| Traffic per hour, day or month | `traffic` | No |
+
+Admins can also rename servers at Hetzner, change their protection, backups and server type. Creating and deleting servers, volumes, load balancers and other project-wide resources are deliberately left out: that is what the Hetzner Console is for. In the same way, orders, cancellations, failover IPs, vSwitches and Windows installations stay in Robot.
 
 ## Outbound proxy
 
-When the proxy is on, **every** request to the Hetzner API, for every project, goes through it. If the proxy is down or rejects the login, requests fail with a clear error; the panel never falls back to a direct connection.
+When the proxy is on, **every** request to Hetzner, for every Cloud project and every Robot account, goes through it. If the proxy is down or rejects the login, requests fail with a clear error; the panel never falls back to a direct connection.
 
 | Protocol | Use it for |
 | --- | --- |
@@ -227,7 +249,7 @@ To switch an existing installation to local-only, run the installer again and ch
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `3000` | Port to listen on. With Docker Compose this is the host port, optionally with an address: `127.0.0.1:3000` listens on the local machine only. The installer writes it for you. |
-| `APP_SECRET` | generated | Key that encrypts API tokens and the proxy password. If empty, one is generated and stored next to the database. Never change it after setup, or the tokens have to be entered again. |
+| `APP_SECRET` | generated | Key that encrypts API tokens, Robot passwords and the proxy password. If empty, one is generated and stored next to the database. Never change it after setup, or the tokens and passwords have to be entered again. |
 | `DATA_DIR` | `./data` (`/data` in Docker) | Where the SQLite database lives. |
 | `NPM_REGISTRY` | `https://registry.npmjs.org/` | Only for building the image yourself: the npm registry or mirror to download packages from. |
 | `COOKIE_SECURE` | `auto` | `auto` marks the session cookie Secure when the request came over HTTPS. Set `true` behind a proxy that does not send `X-Forwarded-Proto`. |
@@ -255,7 +277,7 @@ docker rm -f hetznerdock && docker volume rm hetznerdock_data
 <details>
 <summary><b>Is this an official Hetzner product?</b></summary>
 
-No. Hetzner Dock is an independent open-source project that talks to the public [Hetzner Cloud API](https://docs.hetzner.cloud/). It is not affiliated with or supported by Hetzner Online GmbH.
+No. Hetzner Dock is an independent open-source project that talks to the public [Hetzner Cloud API](https://docs.hetzner.cloud/) and the [Hetzner Robot webservice](https://robot.hetzner.com/doc/webservice/en.html). It is not affiliated with or supported by Hetzner Online GmbH.
 
 </details>
 
@@ -269,7 +291,7 @@ No. Add one API token per project under *Settings → Hetzner projects*. Servers
 <details>
 <summary><b>Can my users see my prices or my other servers?</b></summary>
 
-No. Each user only reaches the servers assigned to them, through a fixed list of operations. Prices and labels are removed from everything they receive, and they only see snapshots, backups and firewalls of their own servers.
+No. Each user only reaches the servers assigned to them, through a fixed list of operations. Prices and labels are removed from everything they receive, and they only see snapshots, backups and firewalls of their own servers. For dedicated servers they never see when the server is paid until, whether it is cancelled, or the SSH keys and other servers of your Robot account.
 
 </details>
 
@@ -277,6 +299,8 @@ No. Each user only reaches the servers assigned to them, through a fixed list of
 <summary><b>Will the panel use up Hetzner's request limit?</b></summary>
 
 Hetzner allows 3600 requests an hour per project. The server list is loaded once for everyone and kept for half a minute, and server pages only check often while something is changing. The overview shows how many requests are left; a busy panel with a handful of users stays far below the limit.
+
+Robot is stricter: it allows 200 server list requests an hour per account, and fewer for resets and Wake on LAN. The panel loads the dedicated server list once a minute for everyone, keeps what each server offers for an hour, and serves server pages from that, so pages left open do not use up the account's limits.
 
 </details>
 
@@ -297,7 +321,7 @@ Turn on the outbound proxy under *Settings* and point it at a proxy that can. Al
 <details>
 <summary><b>Does it work with dedicated servers from Hetzner Robot?</b></summary>
 
-Not yet. Hetzner Dock works with Hetzner Cloud servers. Dedicated servers live in Hetzner Robot, which has a different API.
+Yes. Create a webservice user in Robot under *Settings → Web service and app settings* and add it under *Settings → Robot accounts*. Its dedicated servers appear in *Servers* next to the cloud servers and are assigned the same way. Users can reset them, send Wake on LAN, boot the rescue system or vKVM, install Linux, set reverse DNS and read their traffic. There is no browser console for dedicated servers: Robot has no API for one, but the vKVM rescue system shows the installed system's screen in the browser.
 
 </details>
 
@@ -311,15 +335,16 @@ Yes. The Docker image is published for `linux/amd64` and `linux/arm64`, so it ru
 <details>
 <summary><b>Where is my data stored?</b></summary>
 
-In one SQLite database in a Docker volume (or `./data` when running from source). API tokens and the proxy password are encrypted with your `APP_SECRET`. Root passwords Hetzner returns are shown once and never stored.
+In one SQLite database in a Docker volume (or `./data` when running from source). API tokens, Robot webservice passwords and the proxy password are encrypted with your `APP_SECRET`. Root passwords Hetzner returns, for rebuilds, rescue boots and Linux installations, are shown once and never stored.
 
 </details>
 
 ## Security
 
-- Users reach Hetzner only through the panel, which checks every call against their assignments, the settings and a fixed list of operations; each operation checks its input and that every image, IP and firewall it touches belongs to the server.
-- Each server is reached with the API token of its own project; one project's token is never used for another project's servers.
-- Passwords are hashed with scrypt. API tokens and the proxy password are encrypted with AES-256-GCM.
+- Users reach Hetzner only through the panel, which checks every call against their assignments, the settings and a fixed list of operations; each operation checks its input and that every image, IP, subnet and firewall it touches belongs to the server.
+- Each server is reached with the API token of its own project, or the webservice user of its own Robot account; one account's credentials are never used for another account's servers. Cloud and dedicated servers are told apart everywhere, so a dedicated server's number can never open a cloud server with the same ID.
+- SSH keys users paste for a rescue boot or an installation are added to the project or Robot account for that boot only and deleted again later; users never see or pick the account's own keys.
+- Passwords are hashed with scrypt. API tokens, Robot passwords and the proxy password are encrypted with AES-256-GCM.
 - Sessions are HTTP-only cookies, sign-in attempts are rate limited, and cross-site requests are refused.
 - Every change made through the panel is written to the activity log, without passwords, keys or scripts. Root passwords and console credentials are passed to the browser once and never stored.
 
@@ -327,7 +352,7 @@ Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md
 
 ## Contributing
 
-Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to run the panel locally, including `npm run mock`, a fake Hetzner Cloud API to develop against without an account. The stack is Next.js 16, React 19, Tailwind CSS 4, [shadcn/ui](https://ui.shadcn.com), SQLite (better-sqlite3) and [noVNC](https://github.com/novnc/noVNC). The visual design follows the [taste skill](https://www.tasteskill.dev) (`.claude/skills/design-taste-frontend`).
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to run the panel locally, including `npm run mock`, a fake Hetzner Cloud API and Robot webservice to develop against without an account. The stack is Next.js 16, React 19, Tailwind CSS 4, [shadcn/ui](https://ui.shadcn.com), SQLite (better-sqlite3) and [noVNC](https://github.com/novnc/noVNC). The visual design follows the [taste skill](https://www.tasteskill.dev) (`.claude/skills/design-taste-frontend`).
 
 If Hetzner Dock saves you a few late-night reboot messages, a ⭐ helps other people find it.
 

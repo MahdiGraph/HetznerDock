@@ -6,3 +6,6 @@ contact_links:
   - name: Hetzner Cloud API documentation
     url: https://docs.hetzner.cloud/
     about: What the Hetzner Cloud API can and cannot do.
+  - name: Hetzner Robot webservice documentation
+    url: https://robot.hetzner.com/doc/webservice/en.html
+    about: What the Robot webservice can and cannot do for dedicated servers.

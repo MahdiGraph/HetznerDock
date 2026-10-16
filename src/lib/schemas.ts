@@ -10,16 +10,27 @@ export const ApiToken = z
   .max(200)
   .regex(/^[A-Za-z0-9_-]+$/, "a Hetzner API token has only letters and numbers")
 
+/** A Robot webservice user, such as #ws+AbCd1234. Basic auth cannot carry a colon in it. */
+export const RobotUser = z
+  .string()
+  .trim()
+  .min(1, "enter the webservice user")
+  .max(100)
+  .regex(/^[^\s:]+$/, "a webservice user has no spaces or colons")
+export const RobotPassword = z.string().min(1, "enter the password").max(256)
+
 const LOOPBACK = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/
 
-export const HetznerInput = z.object({
-  baseUrl: z
-    .string()
-    .trim()
-    .url()
-    .refine((u) => u.startsWith("https://") || LOOPBACK.test(u), "must start with https://")
-    .transform((u) => u.replace(/\/+$/, "")),
-})
+const ApiAddress = z
+  .string()
+  .trim()
+  .url()
+  .refine((u) => u.startsWith("https://") || LOOPBACK.test(u), "must start with https://")
+  .transform((u) => u.replace(/\/+$/, ""))
+
+export const HetznerInput = z.object({ baseUrl: ApiAddress })
+
+export const RobotInput = z.object({ baseUrl: ApiAddress })
 
 export const ProxyInput = z
   .object({

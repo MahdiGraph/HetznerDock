@@ -1,9 +1,11 @@
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { clientIp, HttpError, json, readJson, requireApiUser, route } from "@/lib/http"
+import { SERVER_KINDS } from "@/lib/summary"
 import { audit } from "@/lib/audit"
 
 const Body = z.object({
+  kind: z.enum(SERVER_KINDS).default("cloud"),
   projectId: z.number().int().positive(),
   serverId: z.number().int().positive(),
   /** Empty or null goes back to the Hetzner name. */
@@ -19,15 +21,16 @@ export const PUT = route(async (req) => {
   const body = await readJson(req, Body)
   const nickname = body.nickname || null
   const row = db()
-    .prepare("SELECT label FROM assignments WHERE user_id = ? AND project_id = ? AND server_id = ?")
-    .get(user.id, body.projectId, body.serverId) as { label: string | null } | undefined
+    .prepare("SELECT label FROM assignments WHERE user_id = ? AND kind = ? AND project_id = ? AND server_id = ?")
+    .get(user.id, body.kind, body.projectId, body.serverId) as { label: string | null } | undefined
   if (!row) throw new HttpError(404, "Only the users a server is assigned to can give it their own name.")
   db()
-    .prepare("UPDATE assignments SET nickname = ? WHERE user_id = ? AND project_id = ? AND server_id = ?")
-    .run(nickname, user.id, body.projectId, body.serverId)
+    .prepare("UPDATE assignments SET nickname = ? WHERE user_id = ? AND kind = ? AND project_id = ? AND server_id = ?")
+    .run(nickname, user.id, body.kind, body.projectId, body.serverId)
   audit({
     user,
     action: nickname ? `Named the server "${nickname}" for themselves` : "Went back to the Hetzner name of the server",
+    kind: body.kind,
     projectId: body.projectId,
     serverId: body.serverId,
     serverName: row.label,

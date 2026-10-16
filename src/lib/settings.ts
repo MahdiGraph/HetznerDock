@@ -1,12 +1,14 @@
 import { db } from "./db"
 import { decrypt, encrypt } from "./crypto"
 import { listProjects } from "./projects"
+import { listRobotAccounts } from "./robot-accounts"
 import { normalizePermissions, type Permissions } from "./permissions"
 
 export const PROXY_PROTOCOLS = ["http", "https", "socks4", "socks5", "socks5h"] as const
 export type ProxyProtocol = (typeof PROXY_PROTOCOLS)[number]
 
 export const DEFAULT_BASE_URL = "https://api.hetzner.cloud/v1"
+export const DEFAULT_ROBOT_URL = "https://robot-ws.your-server.de"
 
 export type ProxySettings = {
   enabled: boolean
@@ -42,6 +44,15 @@ export function getBaseUrl(): string {
 
 export function saveBaseUrl(baseUrl: string) {
   set("hz.baseUrl", baseUrl === DEFAULT_BASE_URL ? null : baseUrl)
+}
+
+/** The Hetzner Robot webservice address, shared by every Robot account. */
+export function getRobotUrl(): string {
+  return get("robot.baseUrl") || DEFAULT_ROBOT_URL
+}
+
+export function saveRobotUrl(baseUrl: string) {
+  set("robot.baseUrl", baseUrl === DEFAULT_ROBOT_URL ? null : baseUrl)
 }
 
 export function getProxySettings(): ProxySettings {
@@ -84,12 +95,18 @@ export function savePermissions(p: Permissions) {
 /** What the admin settings screen is allowed to see: never the secrets themselves. */
 export function publicSettings() {
   const projects = listProjects()
+  const accounts = listRobotAccounts()
   const proxy = getProxySettings()
   return {
     hetzner: {
       configured: projects.some((p) => !p.unreadable),
       baseUrl: getBaseUrl(),
       projects,
+    },
+    robot: {
+      configured: accounts.some((a) => !a.unreadable),
+      baseUrl: getRobotUrl(),
+      accounts,
     },
     proxy: {
       enabled: proxy.enabled,

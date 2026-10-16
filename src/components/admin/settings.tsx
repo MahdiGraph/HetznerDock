@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/format"
 import { PERMISSION_KEYS, PERMISSION_META, SNAPSHOT_LIMITS, type Permissions } from "@/lib/permissions"
 import { cn } from "@/lib/utils"
 import type { ProjectInfo } from "@/lib/projects"
+import type { RobotAccountInfo } from "@/lib/robot-accounts"
 import type { PublicSettings } from "@/lib/settings"
 
 const DEFAULT_BASE_URL = "https://api.hetzner.cloud/v1"
@@ -50,9 +51,9 @@ function TestNote({ result, className }: { result: TestResult | null; className?
   )
 }
 
-async function runTest(body: Record<string, unknown>): Promise<TestResult> {
+async function runTest(body: Record<string, unknown>, url = "/api/admin/settings/test"): Promise<TestResult> {
   try {
-    return await api<TestResult>("/api/admin/settings/test", { method: "POST", body })
+    return await api<TestResult>(url, { method: "POST", body })
   } catch (err) {
     return { ok: false, message: errorMessage(err), ms: 0, viaProxy: false }
   }
@@ -60,17 +61,25 @@ async function runTest(body: Record<string, unknown>): Promise<TestResult> {
 
 export function SettingsForms({ initial }: { initial: PublicSettings }) {
   const [projects, setProjects] = React.useState(initial.hetzner.projects)
+  const [accounts, setAccounts] = React.useState(initial.robot.accounts)
 
   return (
     <>
-      <PageHeader title="Settings" description="How Hetzner Dock talks to the Hetzner Cloud API, and what your users may do." />
+      <PageHeader
+        title="Settings"
+        description="How Hetzner Dock talks to the Hetzner Cloud API and to Hetzner Robot, and what your users may do."
+      />
       <Board>
         <Tile className="col-span-12 lg:col-span-7 lg:p-8">
           <Projects projects={projects} onChange={setProjects} />
           <BaseUrlForm initial={initial.hetzner.baseUrl} />
         </Tile>
-        <Tile tone="tile" className="col-span-12 lg:col-span-5 lg:p-8">
+        <Tile tone="tile" className="col-span-12 lg:col-span-5 lg:row-span-2 lg:p-8">
           <ProxyForm initial={initial.proxy} />
+        </Tile>
+        <Tile className="col-span-12 lg:col-span-7 lg:p-8">
+          <RobotAccounts accounts={accounts} onChange={setAccounts} />
+          <RobotUrlForm initial={initial.robot.baseUrl} />
         </Tile>
         <Tile className="col-span-12 lg:p-8">
           <PermissionsForm initial={initial.permissions} />
@@ -363,6 +372,311 @@ function BaseUrlForm({ initial }: { initial: string }) {
   )
 }
 
+/* ------------------------------------------------------------------ Robot accounts */
+
+const DEFAULT_ROBOT_URL = "https://robot-ws.your-server.de"
+
+function RobotAccounts({ accounts, onChange }: { accounts: RobotAccountInfo[]; onChange: (a: RobotAccountInfo[]) => void }) {
+  const [editing, setEditing] = React.useState<RobotAccountInfo | null>(null)
+  const [results, setResults] = React.useState<Record<number, TestResult | null>>({})
+  const [testing, setTesting] = React.useState<number | null>(null)
+
+  async function test(account: RobotAccountInfo) {
+    setTesting(account.id)
+    setResults((r) => ({ ...r, [account.id]: null }))
+    const result = await runTest({ accountId: account.id }, "/api/admin/robot-accounts/test")
+    setResults((r) => ({ ...r, [account.id]: result }))
+    setTesting(null)
+  }
+
+  return (
+    <section>
+      <h2 className="display text-3xl">Robot accounts</h2>
+      <p className="prose-serif mt-2 text-base text-muted-foreground">
+        Dedicated servers live in Hetzner Robot. Create a webservice user in Robot under Settings, Web service and app
+        settings, and add it here; the account&apos;s dedicated servers are listed with the cloud servers. Robot blocks the
+        panel&apos;s address for ten minutes after three failed sign-ins, so test a password before you save it.
+      </p>
+
+      {accounts.length ? (
+        <ul className="mt-6 grid gap-2">
+          {accounts.map((a) => (
+            <li key={a.id} className="bg-background/70 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-base font-medium">{a.name}</p>
+                  <p className="text-[13px] break-all text-muted-foreground">
+                    {a.unreadable ? (
+                      <span className="text-destructive">The password cannot be decrypted. Enter it again.</span>
+                    ) : (
+                      <>
+                        {a.username} · added {formatDate(a.created_at)}
+                      </>
+                    )}
+                    {a.assignments ? ` · ${a.assignments} assignment${a.assignments === 1 ? "" : "s"}` : ""}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-wrap gap-1">
+                  <Button size="sm" variant="secondary" onClick={() => test(a)} disabled={testing === a.id}>
+                    {testing === a.id ? <Spinner /> : <PlugsConnectedIcon />} Test
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(a)}>
+                    Edit
+                  </Button>
+                  <ConfirmAction
+                    title={`Remove ${a.name}?`}
+                    description={
+                      a.assignments
+                        ? `Its dedicated servers disappear from the panel and ${a.assignments} assignment${a.assignments === 1 ? " is" : "s are"} removed. The servers themselves are not touched.`
+                        : "Its dedicated servers disappear from the panel. The servers themselves are not touched."
+                    }
+                    confirmLabel="Remove account"
+                    destructive
+                    onConfirm={async () => {
+                      const res = await api<{ accounts: RobotAccountInfo[] }>(`/api/admin/robot-accounts/${a.id}`, { method: "DELETE" })
+                      onChange(res.accounts)
+                      toast.success(`${a.name} removed`)
+                    }}
+                  >
+                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                      Remove
+                    </Button>
+                  </ConfirmAction>
+                </div>
+              </div>
+              <TestNote result={results[a.id] ?? null} className="mt-3" />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <AddRobotAccountForm first={accounts.length === 0} onAdded={onChange} />
+      <EditRobotAccountDialog account={editing} onClose={() => setEditing(null)} onSaved={onChange} />
+    </section>
+  )
+}
+
+function AddRobotAccountForm({ first, onAdded }: { first: boolean; onAdded: (a: RobotAccountInfo[]) => void }) {
+  const [name, setName] = React.useState(first ? "Robot" : "")
+  const [username, setUsername] = React.useState("")
+  const [password, setPassword] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+  const [testing, setTesting] = React.useState(false)
+  const [result, setResult] = React.useState<TestResult | null>(null)
+  const [error, setError] = React.useState<unknown>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await api<{ accounts: RobotAccountInfo[] }>("/api/admin/robot-accounts", {
+        method: "POST",
+        body: { name, username, password },
+      })
+      onAdded(res.accounts)
+      toast.success(`${name} added`)
+      setName("")
+      setUsername("")
+      setPassword("")
+      setResult(null)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form method="post" onSubmit={submit} className="mt-6 bg-background/70 p-4">
+      <p className="text-base font-medium">{first ? "Add a Robot account" : "Add another Robot account"}</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Field>
+          <FieldLabel htmlFor="robot-name">Name</FieldLabel>
+          <Input
+            id="robot-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Dedicated"
+            maxLength={60}
+            required
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="robot-user">Webservice user</FieldLabel>
+          <Input
+            id="robot-user"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.trim())}
+            placeholder="#ws+AbCd1234"
+            autoComplete="off"
+            required
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="robot-password">Password</FieldLabel>
+          <Input
+            id="robot-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </Field>
+      </div>
+      <TestNote result={result} className="mt-3" />
+      <ErrorNote error={error} className="mt-3" />
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button type="submit" disabled={busy || !name.trim() || !username || !password}>
+          {busy ? <Spinner /> : <PlusIcon />} Add account
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={testing || !username || !password}
+          onClick={async () => {
+            setTesting(true)
+            setResult(await runTest({ username, password }, "/api/admin/robot-accounts/test"))
+            setTesting(false)
+          }}
+        >
+          {testing ? <Spinner /> : <PlugsConnectedIcon />} Test sign-in
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function EditRobotAccountDialog({
+  account,
+  onClose,
+  onSaved,
+}: {
+  account: RobotAccountInfo | null
+  onClose: () => void
+  onSaved: (a: RobotAccountInfo[]) => void
+}) {
+  return (
+    <Dialog open={!!account} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        {account ? <EditRobotAccountForm key={account.id} account={account} onClose={onClose} onSaved={onSaved} /> : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditRobotAccountForm({
+  account,
+  onClose,
+  onSaved,
+}: {
+  account: RobotAccountInfo
+  onClose: () => void
+  onSaved: (a: RobotAccountInfo[]) => void
+}) {
+  const [name, setName] = React.useState(account.name)
+  const [username, setUsername] = React.useState(account.username)
+  const [password, setPassword] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<unknown>(null)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await api<{ accounts: RobotAccountInfo[] }>(`/api/admin/robot-accounts/${account.id}`, {
+        method: "PATCH",
+        body: { name, ...(username !== account.username ? { username } : {}), ...(password ? { password } : {}) },
+      })
+      onSaved(res.accounts)
+      toast.success("Robot account saved")
+      onClose()
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form method="post" onSubmit={submit}>
+      <DialogHeader>
+        <DialogTitle className="display text-2xl">{account.name}</DialogTitle>
+        <DialogDescription className="prose-serif text-[15px]">
+          Rename the account or give it another webservice user or password. Assignments stay as they are, as long as the
+          user belongs to the same Robot account.
+        </DialogDescription>
+      </DialogHeader>
+      <FieldGroup className="my-6">
+        <Field>
+          <FieldLabel htmlFor="er-name">Name</FieldLabel>
+          <Input id="er-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} required />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="er-user">Webservice user</FieldLabel>
+          <Input id="er-user" value={username} onChange={(e) => setUsername(e.target.value.trim())} autoComplete="off" required />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="er-password">New password</FieldLabel>
+          <Input
+            id="er-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Leave empty to keep the saved one"
+          />
+        </Field>
+        <ErrorNote error={error} />
+      </FieldGroup>
+      <DialogFooter>
+        <Button type="button" variant="secondary" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={busy || !username}>
+          {busy ? <Spinner /> : null} Save
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+function RobotUrlForm({ initial }: { initial: string }) {
+  const [baseUrl, setBaseUrl] = React.useState(initial)
+  const [busy, setBusy] = React.useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      await api("/api/admin/settings", { method: "PUT", body: { robot: { baseUrl: baseUrl.trim() || DEFAULT_ROBOT_URL } } })
+      toast.success("Webservice address saved")
+    } catch (err) {
+      toast.error(errorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <details className="mt-8">
+      <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">Webservice address</summary>
+      <form method="post" onSubmit={submit} className="mt-4 flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end">
+        <Field className="flex-1">
+          <FieldLabel htmlFor="robot-url">Address used for every Robot account</FieldLabel>
+          <Input id="robot-url" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="bg-background" />
+          <FieldDescription>Leave as {DEFAULT_ROBOT_URL} unless you test against a mock.</FieldDescription>
+        </Field>
+        <Button type="submit" variant="secondary" disabled={busy} className="sm:mb-6">
+          {busy ? <Spinner /> : null} Save
+        </Button>
+      </form>
+    </details>
+  )
+}
+
 /* ------------------------------------------------------------------ proxy */
 
 function ProxyForm({ initial }: { initial: PublicSettings["proxy"] }) {
@@ -410,8 +724,9 @@ function ProxyForm({ initial }: { initial: PublicSettings["proxy"] }) {
         <Switch checked={enabled} onCheckedChange={setEnabled} aria-label="Use a proxy" />
       </div>
       <p className="prose-serif mt-2 text-base text-muted-foreground">
-        When this is on, every request to Hetzner, for every project, goes through the proxy and only through it. If the
-        proxy is down, requests fail instead of going direct. The console connects the browser to Hetzner directly.
+        When this is on, every request to Hetzner, for every project and Robot account, goes through the proxy and only
+        through it. If the proxy is down, requests fail instead of going direct. The console connects the browser to
+        Hetzner directly.
       </p>
       <FieldGroup className={cn("mt-6", !enabled && "opacity-60")}>
         <Field>
@@ -530,8 +845,9 @@ function PermissionsForm({ initial }: { initial: Permissions }) {
         <div>
           <h2 className="display text-3xl">What users can do</h2>
           <p className="prose-serif mt-2 max-w-3xl text-base text-muted-foreground">
-            Users can always see their servers, power them on and off, reboot them, read their graphs and give them their
-            own name. The rest is up to you. Admins can always do everything.
+            Users can always see their servers, power them on and off, reboot or reset them, read their graphs and traffic
+            and give them their own name. The rest is up to you, for cloud and dedicated servers alike. Admins can always do
+            everything.
           </p>
         </div>
         <Button onClick={save} disabled={busy || !dirty} className="shrink-0">
