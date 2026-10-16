@@ -83,7 +83,52 @@ CREATE TABLE IF NOT EXISTS temp_ssh_keys (
  * Schema changes after the first release, applied in order and recorded in
  * user_version. Never edit one that has shipped; add a new one at the end.
  */
-const MIGRATIONS: ((db: DB) => void)[] = []
+const MIGRATIONS: ((db: DB) => void)[] = [
+  // 1. Dedicated servers from Hetzner Robot. A Robot account is a webservice user and its
+  // (encrypted) password. A dedicated server's number can equal a cloud server's ID, so
+  // assignments and the activity log now say which kind of server they mean. For
+  // dedicated servers project_id holds the Robot account, which is why it can no longer
+  // be a foreign key: deleting a project or an account removes its assignments in code.
+  (db) => {
+    db.exec(`
+      CREATE TABLE robot_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        username TEXT NOT NULL,
+        password TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      -- SSH keys the panel adds to a Robot account for one boot, removed again later.
+      CREATE TABLE robot_temp_keys (
+        account_id INTEGER NOT NULL REFERENCES robot_accounts(id) ON DELETE CASCADE,
+        fingerprint TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (account_id, fingerprint)
+      );
+
+      CREATE TABLE assignments_new (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('cloud', 'dedicated')),
+        project_id INTEGER NOT NULL,
+        server_id INTEGER NOT NULL,
+        label TEXT,
+        nickname TEXT,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, kind, project_id, server_id)
+      );
+      INSERT INTO assignments_new (user_id, kind, project_id, server_id, label, nickname, created_at)
+        SELECT user_id, 'cloud', project_id, server_id, label, nickname, created_at FROM assignments;
+      DROP TABLE assignments;
+      ALTER TABLE assignments_new RENAME TO assignments;
+      CREATE INDEX assignments_server ON assignments(kind, project_id, server_id);
+
+      ALTER TABLE audit_logs ADD COLUMN server_kind TEXT;
+      UPDATE audit_logs SET server_kind = 'cloud' WHERE server_id IS NOT NULL;
+    `)
+  },
+]
 
 function migrate(db: DB) {
   const version = db.pragma("user_version", { simple: true }) as number

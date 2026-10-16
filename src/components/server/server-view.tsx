@@ -1,19 +1,14 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
-import { ArrowLeftIcon, PencilSimpleIcon } from "@phosphor-icons/react"
-import { toast } from "sonner"
 import { Board, Tile, TileLabel } from "@/components/board"
 import { CopyButton, ErrorNote, Loading, Notice, useAction } from "@/components/common"
 import { Flag } from "@/components/flag"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useHz } from "@/hooks/use-api"
-import { api, errorMessage, hzCall } from "@/lib/client"
+import { hzCall } from "@/lib/client"
 import type { HzAction } from "@/lib/hz-types"
 import type { PermissionKey, Permissions } from "@/lib/permissions"
 import { get, locationOf, osName, TRANSITIONAL, typeSpec, type Dict } from "@/lib/summary"
@@ -21,6 +16,7 @@ import { AdminTools } from "./admin"
 import { ServerProvider, useActionWatcher, useServer, type ServerContextValue } from "./context"
 import { Firewall } from "./firewall"
 import { Graphs } from "./graphs"
+import { BackLink, RenameButton } from "./header"
 import { History } from "./history"
 import { Iso } from "./iso"
 import { Network } from "./network"
@@ -131,7 +127,14 @@ export function ServerView({
               Cloud server · {projectName} · <span className="tabular">#{id}</span>
             </p>
             {canRename ? (
-              <RenameButton project={project} id={id} hetznerName={String(server.name ?? "")} nickname={nickname} onSaved={setNickname} />
+              <RenameButton
+                kind="cloud"
+                project={project}
+                id={id}
+                hetznerName={String(server.name ?? "")}
+                nickname={nickname}
+                onSaved={setNickname}
+              />
             ) : null}
           </div>
           <div>
@@ -206,17 +209,6 @@ export function ServerView({
   )
 }
 
-function BackLink({ isAdmin }: { isAdmin: boolean }) {
-  return (
-    <Link
-      href={isAdmin ? "/admin/servers" : "/servers"}
-      className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeftIcon className="size-4" /> {isAdmin ? "All servers" : "My servers"}
-    </Link>
-  )
-}
-
 function RescueNotice() {
   const { project, id, can, watch, refresh } = useServer()
   const { busy, run } = useAction()
@@ -242,87 +234,5 @@ function RescueNotice() {
         ) : null}
       </div>
     </Notice>
-  )
-}
-
-/** A name for the server that only this user sees. The name at Hetzner is never changed. */
-function RenameButton({
-  project,
-  id,
-  hetznerName,
-  nickname,
-  onSaved,
-}: {
-  project: number
-  id: number
-  hetznerName: string
-  nickname: string | null
-  onSaved: (nickname: string | null) => void
-}) {
-  const [open, setOpen] = React.useState(false)
-  const [value, setValue] = React.useState(nickname ?? "")
-  const [busy, setBusy] = React.useState(false)
-
-  async function save(next: string | null) {
-    setBusy(true)
-    try {
-      const res = await api<{ nickname: string | null }>("/api/servers/nickname", {
-        method: "PUT",
-        body: { projectId: project, serverId: id, nickname: next },
-      })
-      onSaved(res.nickname)
-      toast.success(res.nickname ? "Name saved. Only you see it." : "Back to the Hetzner name")
-      setOpen(false)
-    } catch (err) {
-      toast.error(errorMessage(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (next) setValue(nickname ?? "")
-        setOpen(next)
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon-sm" aria-label="Rename for me">
-          <PencilSimpleIcon />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <form
-          method="post"
-          onSubmit={(e) => {
-            e.preventDefault()
-            save(value.trim() || null)
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle className="display text-2xl">Your name for this server</DialogTitle>
-            <DialogDescription className="prose-serif text-[15px]">
-              Only you see this name. At Hetzner the server keeps its name, {hetznerName}.
-            </DialogDescription>
-          </DialogHeader>
-          <Input className="my-6" value={value} onChange={(e) => setValue(e.target.value)} placeholder={hetznerName} maxLength={80} autoFocus />
-          <DialogFooter>
-            {nickname ? (
-              <Button type="button" variant="ghost" disabled={busy} onClick={() => save(null)} className="sm:mr-auto">
-                Use the Hetzner name
-              </Button>
-            ) : null}
-            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={busy}>
-              {busy ? <Spinner /> : null} Save
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

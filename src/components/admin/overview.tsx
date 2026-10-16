@@ -10,6 +10,7 @@ import type { AuditRow } from "@/lib/audit"
 import type { PublicSettings } from "@/lib/settings"
 import { formatMoney, timeAgo } from "@/lib/format"
 import { serverHref } from "@/lib/client"
+import { serverKey } from "@/lib/summary"
 import type { AdminServersResponse } from "./servers"
 
 function useServers(enabled: boolean) {
@@ -19,12 +20,13 @@ function useServers(enabled: boolean) {
 function Count({ enabled }: { enabled: boolean }) {
   const { data, error, isLoading } = useServers(enabled)
   const servers = data?.servers ?? []
-  const running = servers.filter((s) => s.status === "running").length
+  const dedicated = servers.filter((s) => s.kind === "dedicated").length
+  const running = servers.filter((s) => s.kind === "cloud" && s.status === "running").length
   const shared = servers.filter((s) => s.assignees.length > 0).length
   return (
     <Tile tone="tile" className="col-span-6 lg:col-span-3">
       <Link href="/admin/servers" className="flex h-full flex-col justify-between gap-6 outline-none">
-        <TileLabel>Cloud servers</TileLabel>
+        <TileLabel>Servers</TileLabel>
         <div>
           {!enabled ? (
             <p className="display text-6xl text-muted-foreground">—</p>
@@ -36,7 +38,11 @@ function Count({ enabled }: { enabled: boolean }) {
             <>
               <p className="display text-6xl tabular">{servers.length}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {servers.length ? `${running} running · ${shared} shared` : "None yet"}
+                {!servers.length
+                  ? "None yet"
+                  : dedicated
+                    ? `${servers.length - dedicated} cloud · ${dedicated} dedicated · ${shared} shared`
+                    : `${running} running · ${shared} shared`}
               </p>
               {data?.errors.length ? (
                 <p className="mt-1 text-sm text-destructive">
@@ -55,6 +61,7 @@ function Cost({ enabled }: { enabled: boolean }) {
   const { data, isLoading } = useServers(enabled)
   const currencies = new Map((data?.projects ?? []).map((p) => [p.id, p.currency]))
   const totals = new Map<string, number>()
+  const dedicated = (data?.servers ?? []).some((s) => s.kind === "dedicated")
   for (const s of data?.servers ?? []) {
     if (s.price === null || s.price === undefined) continue
     const currency = currencies.get(s.projectId) ?? "EUR"
@@ -74,7 +81,10 @@ function Cost({ enabled }: { enabled: boolean }) {
               <p className="display text-4xl tabular">
                 {totals.size ? [...totals].map(([c, v]) => formatMoney(v, c)).join(" + ") : formatMoney(0)}
               </p>
-              <p className="mt-2 text-sm text-muted-foreground">List price with VAT, without backups, volumes or extra IPs</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Cloud list prices with VAT, without backups, volumes or extra IPs
+                {dedicated ? ". Robot does not report what dedicated servers cost" : ""}
+              </p>
             </>
           )}
         </div>
@@ -97,8 +107,8 @@ function TrafficWatch({ enabled }: { enabled: boolean }) {
         {heavy.length ? (
           <ul className="grid gap-2 text-sm">
             {heavy.map(({ s, share }) => (
-              <li key={`${s.projectId}:${s.id}`}>
-                <Link href={serverHref(s.projectId, s.id)} className="flex items-baseline justify-between gap-3 hover:underline">
+              <li key={serverKey(s.kind, s.projectId, s.id)}>
+                <Link href={serverHref(s.kind, s.projectId, s.id)} className="flex items-baseline justify-between gap-3 hover:underline">
                   <span className="truncate">{s.name}</span>
                   <span className={share >= 0.9 ? "text-destructive tabular" : "tabular"}>{Math.round(share * 100)}%</span>
                 </Link>
@@ -123,10 +133,11 @@ function TrafficWatch({ enabled }: { enabled: boolean }) {
 
 function ApiTile({ settings, enabled }: { settings: PublicSettings; enabled: boolean }) {
   const { data } = useServers(enabled)
-  const configured = settings.hetzner.configured
+  const configured = settings.hetzner.configured || settings.robot.configured
   const proxy = settings.proxy
   const projects = settings.hetzner.projects
-  const unreadable = projects.some((p) => p.unreadable)
+  const accounts = settings.robot.accounts
+  const unreadable = projects.some((p) => p.unreadable) || accounts.some((a) => a.unreadable)
   const limits = (data?.projects ?? []).map((p) => p.rateLimit).filter((r): r is NonNullable<typeof r> => !!r)
   const tightest = limits.sort((a, b) => a.remaining / a.limit - b.remaining / b.limit)[0]
   return (
@@ -140,16 +151,21 @@ function ApiTile({ settings, enabled }: { settings: PublicSettings; enabled: boo
           <p className="mt-2 text-sm opacity-80">
             {!configured
               ? unreadable
-                ? "A saved token cannot be read. Enter it again."
-                : "Add a project's API token in Settings"
-              : `${projects.length} project${projects.length === 1 ? "" : "s"}${proxy.enabled ? ` via ${proxy.host}:${proxy.port}` : ", no proxy"}`}
+                ? "A saved token or password cannot be read. Enter it again."
+                : "Add a project's API token or a Robot account in Settings"
+              : `${[
+                  projects.length ? `${projects.length} project${projects.length === 1 ? "" : "s"}` : null,
+                  accounts.length ? `${accounts.length} Robot account${accounts.length === 1 ? "" : "s"}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" and ")}${proxy.enabled ? ` via ${proxy.host}:${proxy.port}` : ", no proxy"}`}
           </p>
           {tightest ? (
             <p className="mt-1 text-sm opacity-80 tabular">
               {tightest.remaining} of {tightest.limit} requests left this hour
             </p>
           ) : null}
-          {configured && unreadable ? <p className="mt-1 text-sm">A saved token cannot be read.</p> : null}
+          {configured && unreadable ? <p className="mt-1 text-sm">A saved token or password cannot be read.</p> : null}
         </div>
       </Link>
     </Tile>
@@ -169,7 +185,7 @@ export function AdminOverview({
   recent: AuditRow[]
   settings: PublicSettings
 }) {
-  const configured = settings.hetzner.configured
+  const configured = settings.hetzner.configured || settings.robot.configured
   const people = users.total - users.admins
 
   return (
@@ -182,7 +198,7 @@ export function AdminOverview({
               ? `${assignments.servers} server${assignments.servers === 1 ? " is" : "s are"} shared with ${people} user${people === 1 ? "" : "s"}.`
               : configured
                 ? "Nothing is shared yet. Create a user, then assign them a server."
-                : "Start by adding the API token of a Hetzner Cloud project."}
+                : "Start by adding the API token of a Hetzner Cloud project or a Robot webservice user."}
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             {configured ? (
@@ -196,7 +212,7 @@ export function AdminOverview({
               </>
             ) : (
               <Button asChild size="lg">
-                <Link href="/admin/settings">Add a project</Link>
+                <Link href="/admin/settings">Open Settings</Link>
               </Button>
             )}
           </div>

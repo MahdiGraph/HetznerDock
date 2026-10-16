@@ -21,34 +21,36 @@ export const DEFAULT_PERMISSIONS: Permissions = {
 
 export const SNAPSHOT_LIMITS = [0, 1, 2, 3, 5, 10] as const
 
+/** Each switch covers cloud servers and, where Robot has the same thing, dedicated servers. */
 export const PERMISSION_META: Record<PermissionKey, { label: string; description: string }> = {
   console: {
     label: "Console",
-    description: "Open the server's screen and keyboard in the browser.",
+    description: "Open a cloud server's screen and keyboard in the browser.",
   },
   rebuild: {
     label: "Rebuild",
-    description: "Wipe the disk and install a fresh image, an app or one of the server's own snapshots.",
+    description:
+      "Wipe the disk and install a fresh image, an app or one of the server's own snapshots; on a dedicated server, a fresh Linux.",
   },
   rescue: {
     label: "Rescue mode",
-    description: "Boot the rescue system to repair a server that no longer starts.",
+    description: "Boot the rescue system to repair a server that no longer starts, cloud or dedicated.",
   },
   password: {
     label: "Reset root password",
-    description: "Have Hetzner set a new root password on the running server.",
+    description: "Have Hetzner set a new root password on a running cloud server.",
   },
   iso: {
     label: "ISO images",
-    description: "Attach an installer ISO to install a system by hand through the console.",
+    description: "Attach an installer ISO to a cloud server to install a system by hand through the console.",
   },
   rdns: {
     label: "Reverse DNS",
-    description: "Change the reverse DNS name of the server's IP addresses.",
+    description: "Change the reverse DNS name of the server's IP addresses, cloud or dedicated.",
   },
   firewall: {
     label: "Firewall",
-    description: "Edit a firewall that protects only this server, or create one for it.",
+    description: "Edit a firewall that protects only this cloud server, or create one for it.",
   },
 }
 

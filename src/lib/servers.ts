@@ -1,30 +1,32 @@
 import { db } from "./db"
 import type { User } from "./auth"
 import { listProjects, projectNames } from "./projects"
+import { listRobotAccounts, robotAccountNames } from "./robot-accounts"
 import { hzFetchAll, hzRequest, HetznerError } from "./hetzner"
 import { cleanupTemporaryKeys } from "./rescue-keys"
-import { summarize, type Dict, type ServerSummary } from "./summary"
+import { accountServers, cachedDedicatedName, summarizeDedicated } from "./dedicated"
+import { serverKey, summarize, type Dict, type ServerKind, type ServerSummary } from "./summary"
 
 export type Assignee = { userId: number; username: string; name: string | null }
 
-export function canAccess(user: User, projectId: number, serverId: number): boolean {
+export function canAccess(user: User, kind: ServerKind, projectId: number, serverId: number): boolean {
   if (user.role === "admin") return true
   return !!db()
-    .prepare("SELECT 1 FROM assignments WHERE user_id = ? AND project_id = ? AND server_id = ?")
-    .get(user.id, projectId, serverId)
+    .prepare("SELECT 1 FROM assignments WHERE user_id = ? AND kind = ? AND project_id = ? AND server_id = ?")
+    .get(user.id, kind, projectId, serverId)
 }
 
-/** Assignees of every server, keyed by "projectId:serverId". */
+/** Assignees of every server, keyed by serverKey(). */
 export function assignmentMap(): Map<string, Assignee[]> {
   const rows = db()
     .prepare(
-      `SELECT a.project_id, a.server_id, u.id AS userId, u.username, u.name FROM assignments a
+      `SELECT a.kind, a.project_id, a.server_id, u.id AS userId, u.username, u.name FROM assignments a
        JOIN users u ON u.id = a.user_id ORDER BY u.username`
     )
-    .all() as (Assignee & { project_id: number; server_id: number })[]
+    .all() as (Assignee & { kind: ServerKind; project_id: number; server_id: number })[]
   const map = new Map<string, Assignee[]>()
   for (const row of rows) {
-    const key = `${row.project_id}:${row.server_id}`
+    const key = serverKey(row.kind, row.project_id, row.server_id)
     const list = map.get(key) ?? []
     list.push({ userId: row.userId, username: row.username, name: row.name })
     map.set(key, list)
@@ -94,32 +96,38 @@ export function cachedServerName(projectId: number, serverId: number): string | 
 }
 
 /** The server's name without asking Hetzner: the cached list, else the name it had when it was assigned. */
-export function knownServerName(projectId: number, serverId: number): string | null {
-  const cachedName = cachedServerName(projectId, serverId)
+export function knownServerName(kind: ServerKind, projectId: number, serverId: number): string | null {
+  const cachedName = kind === "cloud" ? cachedServerName(projectId, serverId) : cachedDedicatedName(projectId, serverId)
   if (cachedName) return cachedName
   const row = db()
-    .prepare("SELECT label FROM assignments WHERE project_id = ? AND server_id = ? AND label IS NOT NULL LIMIT 1")
-    .get(projectId, serverId) as { label: string } | undefined
+    .prepare("SELECT label FROM assignments WHERE kind = ? AND project_id = ? AND server_id = ? AND label IS NOT NULL LIMIT 1")
+    .get(kind, projectId, serverId) as { label: string } | undefined
   return row?.label ?? null
 }
 
-export type ListError = { projectId: number; project: string; message: string }
+export type ListError = { kind: ServerKind; projectId: number; project: string; message: string }
 
-/** Servers across all projects; a project that fails does not hide the others. */
-export async function listAllServers(refresh = false, withPrice = false) {
+const failure = (e: unknown) => (e instanceof HetznerError ? e.message : "Could not load the servers.")
+
+/** Cloud servers of all projects and dedicated servers of all Robot accounts; one that fails does not hide the others. */
+export async function listAllServers(refresh = false, admin = false) {
   const projects = listProjects()
-  const results = await Promise.allSettled(projects.map((p) => projectServers(p.id, refresh)))
+  const accounts = listRobotAccounts()
+  const [cloud, dedicated] = await Promise.all([
+    Promise.allSettled(projects.map((p) => projectServers(p.id, refresh))),
+    Promise.allSettled(accounts.map((a) => accountServers(a.id, refresh))),
+  ])
   const servers: ServerSummary[] = []
   const errors: ListError[] = []
-  results.forEach((r, i) => {
+  cloud.forEach((r, i) => {
     const project = { id: projects[i].id, name: projects[i].name }
-    if (r.status === "fulfilled") servers.push(...r.value.map((raw) => summarize(raw, project, { price: withPrice })))
-    else
-      errors.push({
-        projectId: project.id,
-        project: project.name,
-        message: r.reason instanceof HetznerError ? r.reason.message : "Could not load the servers.",
-      })
+    if (r.status === "fulfilled") servers.push(...r.value.map((raw) => summarize(raw, project, { price: admin })))
+    else errors.push({ kind: "cloud", projectId: project.id, project: project.name, message: failure(r.reason) })
+  })
+  dedicated.forEach((r, i) => {
+    const account = { id: accounts[i].id, name: accounts[i].name }
+    if (r.status === "fulfilled") servers.push(...r.value.map((raw) => summarizeDedicated(raw, account, { admin })))
+    else errors.push({ kind: "dedicated", projectId: account.id, project: account.name, message: failure(r.reason) })
   })
   return { servers, errors }
 }
@@ -129,34 +137,36 @@ export type UserServer = ServerSummary & { error?: string; nickname?: string | n
 /** The servers assigned to a user, with live details from Hetzner. */
 export async function listUserServers(user: User): Promise<UserServer[]> {
   const rows = db()
-    .prepare("SELECT project_id, server_id, label, nickname FROM assignments WHERE user_id = ? ORDER BY created_at")
-    .all(user.id) as { project_id: number; server_id: number; label: string | null; nickname: string | null }[]
-  const names = projectNames()
-  const projectIds = [...new Set(rows.map((r) => r.project_id))]
-  const lists = new Map<number, { raw?: Dict[]; error?: string }>()
+    .prepare("SELECT kind, project_id, server_id, label, nickname FROM assignments WHERE user_id = ? ORDER BY created_at")
+    .all(user.id) as { kind: ServerKind; project_id: number; server_id: number; label: string | null; nickname: string | null }[]
+  const names = { cloud: projectNames(), dedicated: robotAccountNames() }
+  const owners = new Map(rows.map((r) => [`${r.kind}:${r.project_id}`, { kind: r.kind, id: r.project_id }]))
+  const lists = new Map<string, { raw?: Dict[]; error?: string }>()
   await Promise.all(
-    projectIds.map(async (id) => {
+    [...owners].map(async ([key, owner]) => {
       try {
-        lists.set(id, { raw: await projectServers(id) })
+        lists.set(key, { raw: owner.kind === "cloud" ? await projectServers(owner.id) : await accountServers(owner.id) })
       } catch (e) {
-        lists.set(id, { error: e instanceof HetznerError ? e.message : "Could not load this server." })
+        lists.set(key, { error: e instanceof HetznerError ? e.message : "Could not load this server." })
       }
     })
   )
 
   return rows.map((row) => {
-    const project = { id: row.project_id, name: names.get(row.project_id) ?? "Hetzner" }
-    const list = lists.get(row.project_id)
-    const raw = list?.raw?.find((s) => Number(s.id) === row.server_id)
+    const owner = { id: row.project_id, name: names[row.kind].get(row.project_id) ?? "Hetzner" }
+    const list = lists.get(`${row.kind}:${row.project_id}`)
+    const idOf = (s: Dict) => Number(row.kind === "cloud" ? s.id : s.server_number)
+    const raw = list?.raw?.find((s) => idOf(s) === row.server_id)
     if (raw) {
-      const summary = summarize(raw, project)
+      const summary = row.kind === "cloud" ? summarize(raw, owner) : summarizeDedicated(raw, owner)
       // The user's own name for the server wins over the Hetzner name.
       return { ...summary, name: row.nickname || summary.name, nickname: row.nickname }
     }
     return {
+      kind: row.kind,
       id: row.server_id,
-      projectId: project.id,
-      projectName: project.name,
+      projectId: owner.id,
+      projectName: owner.name,
       name: row.nickname || row.label || `Server ${row.server_id}`,
       nickname: row.nickname,
       status: null,

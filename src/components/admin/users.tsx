@@ -32,6 +32,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useApi } from "@/hooks/use-api"
 import { api, errorMessage, serverHref } from "@/lib/client"
 import { timeAgo } from "@/lib/format"
+import { serverKey } from "@/lib/summary"
 import type { AdminUserRow } from "@/lib/users"
 
 export function generatePassword(length = 16) {
@@ -287,10 +288,11 @@ function EditUserForm({
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<unknown>(null)
 
-  async function unassign(projectId: number, serverId: number) {
+  async function unassign(server: AdminUserRow["servers"][number]) {
+    const { kind, project_id: projectId, server_id: serverId } = server
     try {
-      await api("/api/admin/assignments", { method: "DELETE", body: { projectId, serverId, userId: user.id } })
-      setServers((list) => list.filter((s) => !(s.project_id === projectId && s.server_id === serverId)))
+      await api("/api/admin/assignments", { method: "DELETE", body: { kind, projectId, serverId, userId: user.id } })
+      setServers((list) => list.filter((s) => s !== server))
       onSaved()
     } catch (e) {
       toast.error(errorMessage(e))
@@ -350,15 +352,18 @@ function EditUserForm({
             {servers.length ? (
               <ul className="mt-2 grid gap-1">
                 {servers.map((s) => (
-                  <li key={`${s.project_id}:${s.server_id}`} className="flex items-center gap-3 bg-muted px-3 py-2 text-sm">
+                  <li key={serverKey(s.kind, s.project_id, s.server_id)} className="flex items-center gap-3 bg-muted px-3 py-2 text-sm">
                     <Link
-                      href={serverHref(s.project_id, s.server_id)}
+                      href={serverHref(s.kind, s.project_id, s.server_id)}
                       className="min-w-0 flex-1 truncate hover:underline"
                     >
                       {s.label || `Server ${s.server_id}`}
-                      <span className="text-muted-foreground tabular"> · #{s.server_id}</span>
+                      <span className="text-muted-foreground tabular">
+                        {" "}
+                        · {s.kind === "dedicated" ? "dedicated" : "cloud"} #{s.server_id}
+                      </span>
                     </Link>
-                    <Button type="button" size="icon-xs" variant="ghost" aria-label="Unassign" onClick={() => unassign(s.project_id, s.server_id)}>
+                    <Button type="button" size="icon-xs" variant="ghost" aria-label="Unassign" onClick={() => unassign(s)}>
                       <XIcon />
                     </Button>
                   </li>

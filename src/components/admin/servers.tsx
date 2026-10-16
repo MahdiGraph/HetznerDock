@@ -19,35 +19,43 @@ import { useApi } from "@/hooks/use-api"
 import { api, errorMessage, serverHref } from "@/lib/client"
 import { formatMoney } from "@/lib/format"
 import type { RateLimit } from "@/lib/hetzner"
-import type { ServerSummary } from "@/lib/summary"
+import { serverKey, type ServerKind, type ServerSummary } from "@/lib/summary"
 import type { AdminUserRow } from "@/lib/users"
 
 export type AdminServer = ServerSummary & { assignees: { userId: number; username: string; name: string | null }[] }
 export type AdminServersResponse = {
   servers: AdminServer[]
-  errors: { projectId: number; project: string; message: string }[]
+  errors: { kind: ServerKind; projectId: number; project: string; message: string }[]
   projects: { id: number; name: string; currency: string; rateLimit: RateLimit | null }[]
+  /** Robot accounts, whose dedicated servers are listed with the cloud servers. */
+  accounts: { id: number; name: string }[]
 }
 
+const KIND_NAMES: Record<ServerKind, string> = { cloud: "Cloud", dedicated: "Dedicated" }
+
 export function AdminServers({ configured }: { configured: boolean }) {
-  const [project, setProject] = React.useState("all")
+  const [owner, setOwner] = React.useState("all")
   const [query, setQuery] = React.useState("")
   const [refreshing, setRefreshing] = React.useState(false)
   const [assigning, setAssigning] = React.useState<AdminServer | null>(null)
   const { data, error, isLoading, mutate } = useApi<AdminServersResponse>(configured ? "/api/admin/servers" : null)
   const currency = new Map((data?.projects ?? []).map((p) => [p.id, p.currency]))
-  const multiProject = (data?.projects.length ?? 0) > 1
+  // Cloud projects and Robot accounts to filter by, each as "kind:id".
+  const owners = [
+    ...(data?.projects ?? []).map((p) => ({ key: `cloud:${p.id}`, name: p.name })),
+    ...(data?.accounts ?? []).map((a) => ({ key: `dedicated:${a.id}`, name: a.name })),
+  ]
 
   const rows = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = (data?.servers ?? []).filter((s) => project === "all" || String(s.projectId) === project)
+    const list = (data?.servers ?? []).filter((s) => owner === "all" || `${s.kind}:${s.projectId}` === owner)
     if (!q) return list
     return list.filter((s) =>
-      [s.id, s.name, s.ipv4, s.ipv6, s.location, s.type, s.os, s.projectName, s.status, ...s.assignees.map((a) => a.username)]
+      [s.id, s.name, s.ipv4, s.ipv6, s.location, s.type, s.os, s.projectName, s.status, KIND_NAMES[s.kind], ...s.assignees.map((a) => a.username)]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     )
-  }, [data, query, project])
+  }, [data, query, owner])
 
   async function refresh() {
     setRefreshing(true)
@@ -66,9 +74,9 @@ export function AdminServers({ configured }: { configured: boolean }) {
         <PageHeader title="Servers" />
         <Empty className="bg-card py-16">
           <EmptyHeader>
-            <EmptyTitle className="display text-2xl">No Hetzner project yet</EmptyTitle>
+            <EmptyTitle className="display text-2xl">No Hetzner account yet</EmptyTitle>
             <EmptyDescription className="prose-serif text-base">
-              Add a project&apos;s API token in Settings and its servers show up here.
+              Add a Cloud project&apos;s API token or a Robot webservice user in Settings and its servers show up here.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -85,7 +93,7 @@ export function AdminServers({ configured }: { configured: boolean }) {
     <>
       <PageHeader
         title="Servers"
-        description="Every cloud server in your Hetzner projects. Assign one to a user and it appears in their panel."
+        description="Every cloud server of your Hetzner projects and every dedicated server of your Robot accounts. Assign one to a user and it appears in their panel."
         actions={
           <Button variant="secondary" onClick={refresh} disabled={refreshing}>
             {refreshing ? <Spinner /> : <ArrowsClockwiseIcon />} Refresh
@@ -94,16 +102,16 @@ export function AdminServers({ configured }: { configured: boolean }) {
       />
 
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        {multiProject ? (
+        {owners.length > 1 ? (
           <div className="no-scrollbar min-w-0 overflow-x-auto pb-1.5">
-            <Tabs value={project} onValueChange={setProject}>
+            <Tabs value={owner} onValueChange={setOwner}>
               <TabsList variant="line">
                 <TabsTrigger value="all" className="px-3 text-sm">
-                  All projects
+                  All
                 </TabsTrigger>
-                {data!.projects.map((p) => (
-                  <TabsTrigger key={p.id} value={String(p.id)} className="px-3 text-sm">
-                    {p.name}
+                {owners.map((o) => (
+                  <TabsTrigger key={o.key} value={o.key} className="px-3 text-sm">
+                    {o.name}
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -122,13 +130,13 @@ export function AdminServers({ configured }: { configured: boolean }) {
 
       <ErrorNote error={error} className="mb-4" />
       {data?.errors.map((e) => (
-        <ErrorNote key={e.projectId} error={new Error(`${e.project}: ${e.message}`)} className="mb-2" />
+        <ErrorNote key={`${e.kind}:${e.projectId}`} error={new Error(`${e.project}: ${e.message}`)} className="mb-2" />
       ))}
       {isLoading && !data ? (
         <Loading label="Loading servers from Hetzner…" />
       ) : data && rows.length === 0 ? (
         <p className="prose-serif bg-card p-8 text-base text-muted-foreground">
-          {query ? "No server matches that search." : "There are no servers in this project yet."}
+          {query ? "No server matches that search." : "There are no servers here yet."}
         </p>
       ) : data ? (
         <div className="bg-card">
@@ -147,13 +155,13 @@ export function AdminServers({ configured }: { configured: boolean }) {
             </TableHeader>
             <TableBody>
               {rows.map((s) => (
-                <TableRow key={`${s.projectId}:${s.id}`}>
+                <TableRow key={serverKey(s.kind, s.projectId, s.id)}>
                   <TableCell className="py-3 pl-4">
-                    <Link href={serverHref(s.projectId, s.id)} className="font-medium hover:underline">
+                    <Link href={serverHref(s.kind, s.projectId, s.id)} className="font-medium hover:underline">
                       {s.name}
                     </Link>
                     <div className="text-[13px] text-muted-foreground">
-                      {s.projectName} · <span className="tabular">#{s.id}</span>
+                      {KIND_NAMES[s.kind]} · {s.projectName} · <span className="tabular">#{s.id}</span>
                     </div>
                   </TableCell>
                   <TableCell className="tabular">{s.ipv4 ?? s.ipv6 ?? "—"}</TableCell>
@@ -168,6 +176,7 @@ export function AdminServers({ configured }: { configured: boolean }) {
                   <TableCell className="hidden md:table-cell">
                     {s.status ? <StateMark state={s.status} /> : "—"}
                     {s.rescue ? <div className="text-[13px] text-warning">Rescue mode on</div> : null}
+                    {s.cancelled ? <div className="text-[13px] text-destructive">Cancelled</div> : null}
                   </TableCell>
                   <TableCell className="hidden text-right tabular 2xl:table-cell">
                     {formatMoney(s.price, currency.get(s.projectId))}
@@ -200,7 +209,9 @@ function AssignDialog({ server, onClose, onSaved }: { server: AdminServer | null
   return (
     <Dialog open={!!server} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
-        {server ? <AssignForm key={`${server.projectId}:${server.id}`} server={server} onClose={onClose} onSaved={onSaved} /> : null}
+        {server ? (
+          <AssignForm key={serverKey(server.kind, server.projectId, server.id)} server={server} onClose={onClose} onSaved={onSaved} />
+        ) : null}
       </DialogContent>
     </Dialog>
   )
@@ -218,7 +229,7 @@ function AssignForm({ server, onClose, onSaved }: { server: AdminServer; onClose
     try {
       await api("/api/admin/assignments", {
         method: "PUT",
-        body: { projectId: server.projectId, serverId: server.id, label: server.name, userIds: [...selected] },
+        body: { kind: server.kind, projectId: server.projectId, serverId: server.id, label: server.name, userIds: [...selected] },
       })
       toast.success("Assignment saved")
       onSaved()
@@ -235,8 +246,10 @@ function AssignForm({ server, onClose, onSaved }: { server: AdminServer; onClose
       <DialogHeader>
         <DialogTitle className="display text-2xl">Assign {server.name}</DialogTitle>
         <DialogDescription className="prose-serif text-[15px]">
-          Users you tick can manage this server: power, console, rebuild, rescue, network and firewall, within what
-          Settings allows. Admins already see every server.
+          {server.kind === "dedicated"
+            ? "Users you tick can manage this dedicated server: resets, the rescue system, Linux installation, reverse DNS and traffic, within what Settings allows."
+            : "Users you tick can manage this server: power, console, rebuild, rescue, network and firewall, within what Settings allows."}{" "}
+          Admins already see every server.
         </DialogDescription>
       </DialogHeader>
       {users.isLoading ? (

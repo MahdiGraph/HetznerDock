@@ -25,10 +25,11 @@ import type {
 } from "./hz-types"
 
 /**
- * Everything a panel user can do with one server. The gateway route matches the
- * request against this list and refuses anything that is not on it, so users
- * never reach the Hetzner API directly: each operation checks its input, reaches
- * only this server (or resources that belong to it) and says what to log.
+ * Everything a panel user can do with one cloud server. The gateway matches the
+ * request against this list (or, for dedicated servers, the one in
+ * dedicated-operations.ts) and refuses anything that is not on it, so users never
+ * reach the Hetzner API directly: each operation checks its input, reaches only
+ * this server (or resources that belong to it) and says what to log.
  */
 
 type Method = "GET" | "POST" | "PUT" | "DELETE"
@@ -36,7 +37,9 @@ type Method = "GET" | "POST" | "PUT" | "DELETE"
 export type OpContext = {
   user: User
   isAdmin: boolean
+  /** The Hetzner Cloud project, or for a dedicated server its Robot account. */
   projectId: number
+  /** The cloud server's ID, or the dedicated server's number. */
   serverId: number
   params: Record<string, string>
   query: URLSearchParams
@@ -169,7 +172,7 @@ async function usableImage(ctx: OpContext, imageId: number, opts: { system: bool
   throw new HttpError(404, "That image is not available for this server.")
 }
 
-function sshKeysOrThrow(text: string | undefined): string[] {
+export function sshKeysOrThrow(text: string | undefined): string[] {
   if (!text?.trim()) return []
   const { keys, invalid } = parseSshKeys(text)
   if (invalid.length) throw new HttpError(400, `This is not an SSH public key: ${invalid[0]}`)
@@ -248,7 +251,7 @@ async function editableFirewall(ctx: OpContext, firewallId: number) {
 /* ------------------------------------------------------------------ schemas */
 
 const Id = z.number().int().positive()
-const SshKeysText = z.string().max(64 * 1024).optional()
+export const SshKeysText = z.string().max(64 * 1024).optional()
 
 const Cidrs = z.array(z.string().trim().refine(isCidr, "use CIDR blocks such as 203.0.113.0/24 or ::/0")).max(100)
 
@@ -829,7 +832,9 @@ export const OPERATIONS: Op[] = [
       const before = str((await loadServer(ctx)).name)
       ctx.note = `Rename server "${before}" to "${name}" at Hetzner`
       const { data } = await hzRequest<{ server: Dict }>({ projectId: ctx.projectId, method: "PUT", path: base(ctx), body: { name } })
-      db().prepare("UPDATE assignments SET label = ? WHERE project_id = ? AND server_id = ?").run(name, ctx.projectId, ctx.serverId)
+      db()
+        .prepare("UPDATE assignments SET label = ? WHERE kind = 'cloud' AND project_id = ? AND server_id = ?")
+        .run(name, ctx.projectId, ctx.serverId)
       ctx.serverName = name
       return { server: data.server }
     },
@@ -912,8 +917,12 @@ export const OPERATIONS: Op[] = [
 ]
 
 /** Finds the operation for a request, with the IDs the path carries. */
-export function matchOperation(method: string, segments: string[]): { op: Op; params: Record<string, string> } | null {
-  for (const op of OPERATIONS) {
+export function matchOperation(
+  operations: Op[],
+  method: string,
+  segments: string[]
+): { op: Op; params: Record<string, string> } | null {
+  for (const op of operations) {
     if (op.method !== method) continue
     const pattern = op.path ? op.path.split("/") : []
     if (pattern.length !== segments.length) continue

@@ -7,5 +7,6 @@ export const metadata: Metadata = { title: "Servers" }
 
 export default async function AdminServersPage() {
   await requireAdmin()
-  return <AdminServers configured={publicSettings().hetzner.configured} />
+  const settings = publicSettings()
+  return <AdminServers configured={settings.hetzner.configured || settings.robot.configured} />
 }

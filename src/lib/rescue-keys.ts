@@ -12,8 +12,8 @@ const TTL = 2 * 60 * 60_000
 
 const globals = globalThis as unknown as { __hzdockKeyCleanup?: Map<number, number> }
 
-/** Hetzner names SSH keys by their MD5 fingerprint, "b7:2f:30:…". */
-function md5Fingerprint(publicKey: string) {
+/** Hetzner names SSH keys by their MD5 fingerprint, "b7:2f:30:…", in the Cloud API and in Robot. */
+export function md5Fingerprint(publicKey: string) {
   const data = publicKey.trim().split(/\s+/)[1] ?? ""
   const hex = crypto.createHash("md5").update(Buffer.from(data, "base64")).digest("hex")
   return hex.match(/../g)!.join(":")
