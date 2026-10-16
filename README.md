@@ -162,8 +162,12 @@ They sign in at the same address and see only their own servers.
 
 | | |
 | :-: | :-: |
-| <img src="docs/screenshots/overview-dark.png" alt="Admin overview with server counts, the monthly cost, the API requests left this hour, recent activity and servers close to their included traffic" width="440"> | <img src="docs/screenshots/servers-light.png" alt="All servers from two Hetzner projects with country flags, server types, prices and who they are assigned to" width="440"> |
-| **Overview**: cost, traffic, API budget and activity | **Servers** from every project, with flags |
+| <img src="docs/screenshots/overview-dark.png" alt="Admin overview with counts of cloud and dedicated servers, Storage Boxes and DNS zones, the monthly cost, the API requests left this hour, recent activity and servers close to their included traffic" width="440"> | <img src="docs/screenshots/servers-light.png" alt="Cloud and dedicated servers from two Hetzner projects and two Robot accounts, with country flags, server types, states and who they are assigned to" width="440"> |
+| **Overview**: cost, traffic, API budget and activity | **Servers** from every project and Robot account, with flags |
+| <img src="docs/screenshots/dedicated-dark.png" alt="A dedicated server from Hetzner Robot: its state with reset and Wake on LAN buttons, a rescue boot waiting for the next start, and tabs to install Linux, boot the rescue system, set reverse DNS and see traffic" width="440"> | <img src="docs/screenshots/storage-dark.png" alt="A Storage Box 62 percent full, with the host and user to connect with, switches for SSH, Samba, WebDAV, the snapshot folder and access from outside Hetzner, and tabs for snapshots, sub-accounts and history" width="440"> |
+| **Dedicated servers** from Hetzner Robot | **Storage Boxes**: usage, access, snapshots |
+| <img src="docs/screenshots/dns-dark.png" alt="A DNS zone with Hetzner's three name servers, its delegation, 17 records and the form to add one" width="440"> | <img src="docs/screenshots/dns-records-dark.png" alt="DNS records of a zone: MX values with a comment, TXT, CAA and the zone's own NS records, each with its TTL" width="440"> |
+| **DNS zones**: name servers and delegation | **Records**, edited in place |
 | <img src="docs/screenshots/rebuild-dark.png" alt="Rebuild tab with operating systems, apps, snapshots and backups to choose from" width="440"> | <img src="docs/screenshots/history-dark.png" alt="A rebuild running at 31 percent on the History tab" width="440"> |
 | **Rebuild** from an image, app or snapshot | **History**: a rebuild in progress |
 | <img src="docs/screenshots/firewall-dark.png" alt="A firewall that protects only this server, with its incoming rules and an Edit rules button" width="440"> | <img src="docs/screenshots/settings-dark.png" alt="Settings with two Hetzner projects and a SOCKS5 proxy" width="440"> |
@@ -179,8 +183,8 @@ They sign in at the same address and see only their own servers.
 | **Network** and reverse DNS | **Graphs** |
 | <img src="docs/screenshots/snapshots-dark.png" alt="Two snapshots of a server with buttons to rebuild from them, rename and delete them" width="440"> | <img src="docs/screenshots/activity-dark.png" alt="Activity log with users, actions, servers and results" width="440"> |
 | **Snapshots** within the limit you set | **Activity log** |
-| <img src="docs/screenshots/my-servers-dark.png" alt="A user's list of their servers" width="440"> | <img src="docs/screenshots/login-dark.png" alt="Sign-in page" width="440"> |
-| **A user's servers** | **Sign in** |
+| <img src="docs/screenshots/my-servers-dark.png" alt="A user's list with two cloud servers, a dedicated server, a Storage Box and a DNS zone" width="440"> | <img src="docs/screenshots/login-dark.png" alt="Sign-in page" width="440"> |
+| **A user's servers** of every kind | **Sign in** |
 | <img src="docs/screenshots/overview-light.png" alt="Admin overview in the light theme" width="440"> | <img src="docs/screenshots/mobile-dark.png" alt="A server on a phone" width="200"> |
 | **Light theme** | **On a phone** |
 
