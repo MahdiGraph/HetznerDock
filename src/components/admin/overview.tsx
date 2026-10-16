@@ -20,9 +20,10 @@ function useServers(enabled: boolean) {
 function Count({ enabled }: { enabled: boolean }) {
   const { data, error, isLoading } = useServers(enabled)
   const all = data?.servers ?? []
-  // Storage Boxes are counted on their own line.
-  const servers = all.filter((s) => s.kind !== "storage")
-  const boxes = all.length - servers.length
+  // Storage Boxes and DNS zones are counted on their own line.
+  const servers = all.filter((s) => s.kind !== "storage" && s.kind !== "dns")
+  const boxes = all.filter((s) => s.kind === "storage").length
+  const zones = all.filter((s) => s.kind === "dns").length
   const dedicated = servers.filter((s) => s.kind === "dedicated").length
   const running = servers.filter((s) => s.kind === "cloud" && s.status === "running").length
   const shared = servers.filter((s) => s.assignees.length > 0).length
@@ -47,9 +48,12 @@ function Count({ enabled }: { enabled: boolean }) {
                     ? `${servers.length - dedicated} cloud · ${dedicated} dedicated · ${shared} shared`
                     : `${running} running · ${shared} shared`}
               </p>
-              {boxes ? (
+              {boxes || zones ? (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  and {boxes} Storage Box{boxes === 1 ? "" : "es"}
+                  and{" "}
+                  {[boxes ? `${boxes} Storage Box${boxes === 1 ? "" : "es"}` : null, zones ? `${zones} DNS zone${zones === 1 ? "" : "s"}` : null]
+                    .filter(Boolean)
+                    .join(", ")}
                 </p>
               ) : null}
               {data?.errors.length ? (

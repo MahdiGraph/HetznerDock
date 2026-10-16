@@ -1,6 +1,6 @@
 /** Shared between server and client: what users (not admins) may do with their servers. */
 
-export const PERMISSION_KEYS = ["console", "rebuild", "rescue", "password", "iso", "rdns", "firewall", "storage"] as const
+export const PERMISSION_KEYS = ["console", "rebuild", "rescue", "password", "iso", "rdns", "firewall", "storage", "dns"] as const
 export type PermissionKey = (typeof PERMISSION_KEYS)[number]
 
 export type Permissions = Record<PermissionKey, boolean> & {
@@ -17,6 +17,7 @@ export const DEFAULT_PERMISSIONS: Permissions = {
   rdns: true,
   firewall: true,
   storage: true,
+  dns: true,
   snapshots: 1,
 }
 
@@ -52,6 +53,10 @@ export const PERMISSION_META: Record<PermissionKey, { label: string; description
   storage: {
     label: "Storage Boxes",
     description: "Reset a Storage Box's password, change how it can be reached, and manage its snapshots and sub-accounts.",
+  },
+  dns: {
+    label: "DNS zones",
+    description: "Add, change and delete the records of a DNS zone, and change its default TTL.",
   },
   firewall: {
     label: "Firewall",

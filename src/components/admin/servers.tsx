@@ -31,9 +31,9 @@ export type AdminServersResponse = {
   accounts: { id: number; name: string }[]
 }
 
-const KIND_NAMES: Record<ServerKind, string> = { cloud: "Cloud", dedicated: "Dedicated", storage: "Storage Box" }
+const KIND_NAMES: Record<ServerKind, string> = { cloud: "Cloud", dedicated: "Dedicated", storage: "Storage Box", dns: "DNS zone" }
 
-/** Storage Boxes belong to a Hetzner project, so they share its filter tab. */
+/** Storage Boxes and DNS zones belong to a Hetzner project, so they share its filter tab. */
 const ownerKey = (s: ServerSummary) => `${s.kind === "dedicated" ? "dedicated" : "cloud"}:${s.projectId}`
 
 export function AdminServers({ configured }: { configured: boolean }) {
@@ -253,7 +253,9 @@ function AssignForm({ server, onClose, onSaved }: { server: AdminServer; onClose
             ? "Users you tick can manage this dedicated server: resets, the rescue system, Linux installation, reverse DNS and traffic, within what Settings allows."
             : server.kind === "storage"
               ? "Users you tick can use this Storage Box: see its usage, reset its password, change access, and manage snapshots and sub-accounts, within what Settings allows."
-              : "Users you tick can manage this server: power, console, rebuild, rescue, network and firewall, within what Settings allows."}{" "}
+              : server.kind === "dns"
+                ? "Users you tick can manage the records of this DNS zone and its default TTL, within what Settings allows."
+                : "Users you tick can manage this server: power, console, rebuild, rescue, network and firewall, within what Settings allows."}{" "}
           Admins already see every server.
         </DialogDescription>
       </DialogHeader>

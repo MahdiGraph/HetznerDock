@@ -4,7 +4,7 @@
 
 # Hetzner Dock
 
-**A self-hosted control panel for sharing Hetzner Cloud servers, dedicated servers and Storage Boxes with your customers, friends and team.**
+**A self-hosted control panel for sharing Hetzner Cloud servers, dedicated servers, Storage Boxes and DNS zones with your customers, friends and team.**
 
 Everyone gets their own login to restart, rebuild, rescue and watch *their* servers, cloud servers with the console right in the browser and dedicated servers from Hetzner Robot. Nobody needs your Hetzner account.
 
@@ -66,6 +66,16 @@ Storage Boxes of your Hetzner projects join the same list, so backup space is ha
 - **Snapshots**: take, delete and roll back to snapshots, and turn automatic daily snapshots on or off.
 - **Sub-accounts**: give each machine or person its own login that only sees one folder, read-only if you like.
 - **History**: everything Hetzner did on the box, with live progress.
+
+### DNS zones
+
+DNS zones of your Hetzner projects join the list too, so a customer can look after the records of their own domain. The zone's page shows its name servers and whether the domain points at them, and lets users:
+
+- **Records**: add, change and delete A, AAAA, CNAME, MX, TXT, SRV, CAA and NS records, each with its own TTL or the zone's. Names and values are checked before they go to Hetzner, and TXT text is quoted for you.
+- **Default TTL**: how long resolvers may keep an answer from the zone.
+- **History**: everything Hetzner did on the zone, with live progress.
+
+Secondary zones are shown read-only, and the zone's own NS records stay as Hetzner set them.
 
 ### For you, the admin
 
@@ -210,7 +220,14 @@ Storage Boxes go through the [Hetzner API](https://docs.hetzner.cloud/reference/
 | Access settings, new password, snapshots and their plan, sub-accounts | `update_access_settings`, `reset_password`, `snapshots`, `enable_snapshot_plan`, `subaccounts` | Yes, with *Storage Boxes* |
 | Usage, connection details, history | `storage_boxes`, `actions` | No |
 
-Admins can also rename servers at Hetzner, change their protection, backups and server type. Creating and deleting servers, volumes, load balancers and other project-wide resources are deliberately left out: that is what the Hetzner Console is for. In the same way, orders, cancellations, failover IPs, vSwitches and Windows installations stay in Robot, and ordering, resizing and deleting Storage Boxes stays in the Hetzner Console; admins can turn a box's delete protection on or off.
+DNS zones go through the [Cloud API](https://docs.hetzner.cloud/reference/cloud#zones), with the token of the zone's own project:
+
+| On the DNS zone page | Cloud API | Can be turned off |
+| --- | --- | --- |
+| Add, change and delete records, the default TTL | `rrsets`, `set_records`, `change_ttl` | Yes, with *DNS zones* |
+| Name servers and delegation, records, history | `zones`, `rrsets`, `actions` | No |
+
+Admins can also rename servers at Hetzner, change their protection, backups and server type. Creating and deleting servers, volumes, load balancers and other project-wide resources are deliberately left out: that is what the Hetzner Console is for. In the same way, orders, cancellations, failover IPs, vSwitches and Windows installations stay in Robot, and ordering, resizing and deleting Storage Boxes stays in the Hetzner Console; admins can turn a box's delete protection on or off. Creating, importing and deleting DNS zones stays there as well, and so does the protection of single records; admins can turn a zone's delete protection on or off.
 
 ## Outbound proxy
 
