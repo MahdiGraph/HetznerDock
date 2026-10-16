@@ -24,8 +24,8 @@ export const PUT = route(async (req) => {
   const admin = requireApiAdmin(req)
   const body = await readJson(req, Put)
   const { kind, projectId, serverId } = body
-  if (kind === "cloud" ? !getProject(projectId) : !getRobotAccount(projectId)) {
-    throw new HttpError(404, kind === "cloud" ? "That Hetzner project does not exist." : "That Robot account does not exist.")
+  if (kind === "dedicated" ? !getRobotAccount(projectId) : !getProject(projectId)) {
+    throw new HttpError(404, kind === "dedicated" ? "That Robot account does not exist." : "That Hetzner project does not exist.")
   }
 
   const current = db()

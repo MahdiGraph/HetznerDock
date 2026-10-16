@@ -31,7 +31,10 @@ export type AdminServersResponse = {
   accounts: { id: number; name: string }[]
 }
 
-const KIND_NAMES: Record<ServerKind, string> = { cloud: "Cloud", dedicated: "Dedicated" }
+const KIND_NAMES: Record<ServerKind, string> = { cloud: "Cloud", dedicated: "Dedicated", storage: "Storage Box" }
+
+/** Storage Boxes belong to a Hetzner project, so they share its filter tab. */
+const ownerKey = (s: ServerSummary) => `${s.kind === "dedicated" ? "dedicated" : "cloud"}:${s.projectId}`
 
 export function AdminServers({ configured }: { configured: boolean }) {
   const [owner, setOwner] = React.useState("all")
@@ -48,10 +51,10 @@ export function AdminServers({ configured }: { configured: boolean }) {
 
   const rows = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = (data?.servers ?? []).filter((s) => owner === "all" || `${s.kind}:${s.projectId}` === owner)
+    const list = (data?.servers ?? []).filter((s) => owner === "all" || ownerKey(s) === owner)
     if (!q) return list
     return list.filter((s) =>
-      [s.id, s.name, s.ipv4, s.ipv6, s.location, s.type, s.os, s.projectName, s.status, KIND_NAMES[s.kind], ...s.assignees.map((a) => a.username)]
+      [s.id, s.name, s.ipv4, s.ipv6, s.host, s.location, s.type, s.os, s.projectName, s.status, KIND_NAMES[s.kind], ...s.assignees.map((a) => a.username)]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q))
     )
@@ -164,7 +167,7 @@ export function AdminServers({ configured }: { configured: boolean }) {
                       {KIND_NAMES[s.kind]} · {s.projectName} · <span className="tabular">#{s.id}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="tabular">{s.ipv4 ?? s.ipv6 ?? "—"}</TableCell>
+                  <TableCell className="tabular">{s.host ?? s.ipv4 ?? s.ipv6 ?? "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell">
                     <Flag country={s.country} className="mr-1.5" />
                     {s.location ?? "—"}
@@ -248,7 +251,9 @@ function AssignForm({ server, onClose, onSaved }: { server: AdminServer; onClose
         <DialogDescription className="prose-serif text-[15px]">
           {server.kind === "dedicated"
             ? "Users you tick can manage this dedicated server: resets, the rescue system, Linux installation, reverse DNS and traffic, within what Settings allows."
-            : "Users you tick can manage this server: power, console, rebuild, rescue, network and firewall, within what Settings allows."}{" "}
+            : server.kind === "storage"
+              ? "Users you tick can use this Storage Box: see its usage, reset its password, change access, and manage snapshots and sub-accounts, within what Settings allows."
+              : "Users you tick can manage this server: power, console, rebuild, rescue, network and firewall, within what Settings allows."}{" "}
           Admins already see every server.
         </DialogDescription>
       </DialogHeader>

@@ -4,7 +4,7 @@ import { HttpsProxyAgent } from "https-proxy-agent"
 import { SocksProxyAgent } from "socks-proxy-agent"
 import { APP_VERSION } from "./config"
 import { projectToken } from "./projects"
-import { getBaseUrl, getProxySettings, type ProxySettings } from "./settings"
+import { getBaseUrl, getHetznerApiUrl, getProxySettings, type ProxySettings } from "./settings"
 
 /**
  * Every request to Hetzner goes through this module: the Cloud API client below,
@@ -40,6 +40,8 @@ export type HzRequest = {
   timeoutMs?: number
   /** Use these values instead of the saved ones (for "test connection"). */
   override?: { token: string | null; baseUrl: string; proxy: ProxySettings }
+  /** "hetzner" sends the request to the Hetzner API (Storage Boxes) instead of the Cloud API. */
+  api?: "cloud" | "hetzner"
 }
 
 export type HzResponse<T> = { status: number; data: T }
@@ -266,7 +268,7 @@ export function parseBody(text: string): unknown {
 }
 
 export async function hzRequest<T = unknown>(req: HzRequest): Promise<HzResponse<T>> {
-  const baseUrl = req.override?.baseUrl ?? getBaseUrl()
+  const baseUrl = req.override?.baseUrl ?? (req.api === "hetzner" ? getHetznerApiUrl() : getBaseUrl())
   const proxy = req.override?.proxy ?? getProxySettings()
   const token = req.override ? req.override.token : req.projectId !== undefined ? projectToken(req.projectId) : null
   if (!token) {
@@ -305,11 +307,12 @@ export async function hzFetchAll<T>(
   path: string,
   key: string,
   query: Record<string, QueryValue> = {},
-  max = 5000
+  max = 5000,
+  api: "cloud" | "hetzner" = "cloud"
 ): Promise<T[]> {
   const items: T[] = []
   for (let page = 1; items.length < max; page++) {
-    const { data } = await hzRequest<Record<string, unknown>>({ projectId, path, query: { ...query, page, per_page: 50 } })
+    const { data } = await hzRequest<Record<string, unknown>>({ projectId, path, api, query: { ...query, page, per_page: 50 } })
     const list = (Array.isArray(data?.[key]) ? data[key] : []) as T[]
     items.push(...list)
     const pagination = (data?.meta as { pagination?: { next_page?: number | null } } | undefined)?.pagination

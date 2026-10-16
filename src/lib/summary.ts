@@ -22,7 +22,7 @@ export const TRANSITIONAL = ["initializing", "starting", "stopping", "deleting",
  * account. A dedicated server's number can equal a cloud server's ID, so a server
  * is always named by its kind, its project or account, and its ID.
  */
-export const SERVER_KINDS = ["cloud", "dedicated"] as const
+export const SERVER_KINDS = ["cloud", "dedicated", "storage"] as const
 export type ServerKind = (typeof SERVER_KINDS)[number]
 
 /** A server's key in maps and lists, "dedicated:2:1234567". */
@@ -60,6 +60,10 @@ export type ServerSummary = {
   price?: number | null
   /** Whether a dedicated server is cancelled at Hetzner, only filled in for admins. */
   cancelled?: boolean
+  /** A Storage Box's host name, shown where servers show their IP. */
+  host?: string | null
+  /** A Storage Box's used and available bytes. */
+  usage?: { used: number; size: number } | null
 }
 
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : null)

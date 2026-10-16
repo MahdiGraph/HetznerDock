@@ -4,7 +4,7 @@
 
 # Hetzner Dock
 
-**A self-hosted control panel for sharing Hetzner Cloud and dedicated servers with your customers, friends and team.**
+**A self-hosted control panel for sharing Hetzner Cloud servers, dedicated servers and Storage Boxes with your customers, friends and team.**
 
 Everyone gets their own login to restart, rebuild, rescue and watch *their* servers, cloud servers with the console right in the browser and dedicated servers from Hetzner Robot. Nobody needs your Hetzner account.
 
@@ -56,6 +56,16 @@ The same page, with what the [Robot webservice](https://robot.hetzner.com/doc/we
 - **Install Linux**: wipe the disks and install any distribution Robot offers, with SSH keys, starting right away or at the next start.
 - **Network**: reverse DNS for the main IPv4 address, extra addresses, IPv4 subnets and any address of the IPv6 /64.
 - **Traffic**: incoming and outgoing traffic per hour, day or month, for all the server's addresses together.
+
+### Storage Boxes
+
+Storage Boxes of your Hetzner projects join the same list, so backup space is handed out the same way. Their page shows how full the box is and how to connect to it, and lets users:
+
+- **Access**: switch SSH and SFTP, Samba, WebDAV, the snapshot folder and access from outside Hetzner on and off.
+- **Password**: set a new one, shown once.
+- **Snapshots**: take, delete and roll back to snapshots, and turn automatic daily snapshots on or off.
+- **Sub-accounts**: give each machine or person its own login that only sees one folder, read-only if you like.
+- **History**: everything Hetzner did on the box, with live progress.
 
 ### For you, the admin
 
@@ -193,7 +203,14 @@ Dedicated servers go through the [Robot webservice](https://robot.hetzner.com/do
 | Reverse DNS of the server's own addresses and subnets | `rdns` | Yes, with *Reverse DNS* |
 | Traffic per hour, day or month | `traffic` | No |
 
-Admins can also rename servers at Hetzner, change their protection, backups and server type. Creating and deleting servers, volumes, load balancers and other project-wide resources are deliberately left out: that is what the Hetzner Console is for. In the same way, orders, cancellations, failover IPs, vSwitches and Windows installations stay in Robot.
+Storage Boxes go through the [Hetzner API](https://docs.hetzner.cloud/reference/hetzner) at `api.hetzner.com`, with the token of the box's own project:
+
+| On the Storage Box page | Hetzner API | Can be turned off |
+| --- | --- | --- |
+| Access settings, new password, snapshots and their plan, sub-accounts | `update_access_settings`, `reset_password`, `snapshots`, `enable_snapshot_plan`, `subaccounts` | Yes, with *Storage Boxes* |
+| Usage, connection details, history | `storage_boxes`, `actions` | No |
+
+Admins can also rename servers at Hetzner, change their protection, backups and server type. Creating and deleting servers, volumes, load balancers and other project-wide resources are deliberately left out: that is what the Hetzner Console is for. In the same way, orders, cancellations, failover IPs, vSwitches and Windows installations stay in Robot, and ordering, resizing and deleting Storage Boxes stays in the Hetzner Console; admins can turn a box's delete protection on or off.
 
 ## Outbound proxy
 
