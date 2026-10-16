@@ -1,7 +1,7 @@
 "use client"
 
 import useSWR, { type SWRConfiguration } from "swr"
-import { fetcher, hzUrl, robotUrl, storageUrl } from "@/lib/client"
+import { dnsUrl, fetcher, hzUrl, robotUrl, storageUrl } from "@/lib/client"
 
 type Query = Record<string, string | number | boolean | undefined | null>
 
@@ -23,6 +23,11 @@ export function useHz<T>(project: number, id: number, sub: string | null, query?
 /** The same for a Storage Box: its Hetzner project and ID. */
 export function useStorage<T>(project: number, id: number, sub: string | null, query?: Query, config?: SWRConfiguration<T>) {
   return useApi<T>(sub === null ? null : storageUrl(project, id, sub, query), config)
+}
+
+/** The same for a DNS zone: its Hetzner project and ID. */
+export function useDns<T>(project: number, id: number, sub: string | null, query?: Query, config?: SWRConfiguration<T>) {
+  return useApi<T>(sub === null ? null : dnsUrl(project, id, sub, query), config)
 }
 
 /** The same for a dedicated server: its Robot account and number. */

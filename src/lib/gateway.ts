@@ -2,6 +2,8 @@ import type { NextRequest } from "next/server"
 import { audit } from "./audit"
 import { invalidateAccount } from "./dedicated"
 import { DEDICATED_OPERATIONS } from "./dedicated-operations"
+import { invalidateZones } from "./dns"
+import { DNS_OPERATIONS } from "./dns-operations"
 import { HetznerError } from "./hetzner"
 import { clientIp, HttpError, json, parseWith, requireApiUser, route } from "./http"
 import { matchOperation, OPERATIONS, type OpContext } from "./operations"
@@ -26,6 +28,7 @@ const KINDS = {
     invalidate: invalidateAccount,
   },
   storage: { owner: getProject, operations: STORAGE_OPERATIONS, unknown: "Unknown Hetzner project.", invalidate: invalidateStorage },
+  dns: { owner: getProject, operations: DNS_OPERATIONS, unknown: "Unknown Hetzner project.", invalidate: invalidateZones },
 }
 
 /**

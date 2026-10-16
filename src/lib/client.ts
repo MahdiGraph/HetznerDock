@@ -51,6 +51,7 @@ function qs(query?: Query) {
 export function serverHref(kind: ServerKind, project: number, id: number) {
   if (kind === "dedicated") return `/servers/dedicated/${project}/${id}`
   if (kind === "storage") return `/servers/storage/${project}/${id}`
+  if (kind === "dns") return `/servers/dns/${project}/${id}`
   return `/servers/${project}/${id}`
 }
 
@@ -96,6 +97,15 @@ export function storageUrl(project: number, id: number, sub = "", query?: Query)
 
 export function storageCall<T = unknown>(project: number, id: number, method: "GET" | "POST" | "PUT" | "DELETE", sub = "", body?: unknown) {
   return api<T>(storageUrl(project, id, sub), { method, body })
+}
+
+/** A call for one DNS zone (a Hetzner project and the zone's ID) through the panel's gateway. */
+export function dnsUrl(project: number, id: number, sub = "", query?: Query) {
+  return `/api/hz/dns/${project}/${id}${sub ? `/${sub}` : ""}${qs(query)}`
+}
+
+export function dnsCall<T = unknown>(project: number, id: number, method: "GET" | "POST" | "PUT" | "DELETE", sub = "", body?: unknown) {
+  return api<T>(dnsUrl(project, id, sub), { method, body })
 }
 
 export function errorMessage(e: unknown) {

@@ -44,8 +44,9 @@ export function MyServers({ name }: { name: string }) {
               >
                 <div className="col-span-12 min-w-0 md:col-span-4">
                   <p className="text-[13px] text-muted-foreground">
-                    {s.kind === "dedicated" ? "Dedicated server" : s.kind === "storage" ? "Storage Box" : "Cloud server"}
-                    {s.type ? ` ${s.type}` : ""}
+                    {s.kind === "dns"
+                      ? `${s.type === "Secondary" ? "Secondary " : ""}DNS zone`
+                      : `${s.kind === "dedicated" ? "Dedicated server" : s.kind === "storage" ? "Storage Box" : "Cloud server"}${s.type ? ` ${s.type}` : ""}`}
                   </p>
                   <p className="display mt-1 truncate text-2xl md:text-3xl">{s.name}</p>
                 </div>
@@ -54,14 +55,20 @@ export function MyServers({ name }: { name: string }) {
                 ) : (
                   <>
                     <div className="col-span-6 min-w-0 md:col-span-2">
-                      <p className="text-[13px] text-muted-foreground">{s.kind === "storage" ? "Host" : "IP address"}</p>
+                      <p className="text-[13px] text-muted-foreground">{s.kind === "storage" ? "Host" : s.kind === "dns" ? "Domain" : "IP address"}</p>
                       <p className="mt-0.5 truncate text-base tabular">{s.host ?? s.ipv4 ?? s.ipv6 ?? "—"}</p>
                     </div>
                     <div className="col-span-6 min-w-0 md:col-span-2">
-                      <p className="text-[13px] text-muted-foreground">Location</p>
+                      <p className="text-[13px] text-muted-foreground">{s.kind === "dns" ? "Records" : "Location"}</p>
                       <p className="mt-0.5 truncate text-base">
-                        <Flag country={s.country} className="mr-1.5" />
-                        {s.location ?? "—"}
+                        {s.kind === "dns" ? (
+                          (s.spec ?? "—")
+                        ) : (
+                          <>
+                            <Flag country={s.country} className="mr-1.5" />
+                            {s.location ?? "—"}
+                          </>
+                        )}
                       </p>
                     </div>
                     <div className="col-span-9 min-w-0 md:col-span-3">

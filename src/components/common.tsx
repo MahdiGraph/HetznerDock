@@ -111,8 +111,8 @@ export function CopyButton({ value, label = "Copy", className }: { value: string
   )
 }
 
-const GOOD = ["RUNNING", "SUCCESS", "APPLIED", "AVAILABLE", "ON", "ROUTED", "ACTIVE", "ENABLED", "READY"]
-const BUSY = ["INITIALIZING", "STARTING", "STOPPING", "MIGRATING", "REBUILDING", "DELETING", "PENDING", "CREATING", "IN_PROCESS"]
+const GOOD = ["RUNNING", "SUCCESS", "APPLIED", "AVAILABLE", "ON", "ROUTED", "ACTIVE", "ENABLED", "READY", "OK"]
+const BUSY = ["INITIALIZING", "STARTING", "STOPPING", "MIGRATING", "REBUILDING", "DELETING", "PENDING", "CREATING", "IN_PROCESS", "UPDATING"]
 const BAD = ["ERROR", "BLOCKED", "FAILED", "UNAVAILABLE", "LOCKED"]
 
 export function stateTone(state: string | null | undefined): "good" | "busy" | "bad" | "idle" {

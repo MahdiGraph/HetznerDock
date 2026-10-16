@@ -6,7 +6,7 @@
 //
 // Then, in the panel: Settings → API address → http://localhost:4010/v1, and add
 // one of the tokens printed at start as a project. Servers, actions, images,
-// metrics, firewalls, Storage Boxes and a small VNC console behave like the real API, closely
+// metrics, firewalls, Storage Boxes, DNS zones and a small VNC console behave like the real API, closely
 // enough to click through every screen. For dedicated servers, set Settings →
 // Robot accounts → Webservice address to http://localhost:4010/robot and add a
 // webservice user printed at start (see mock-robot.mjs). Everything is kept in
@@ -207,6 +207,8 @@ const state = {
   storageBoxes: [],
   boxSnapshots: [],
   subaccounts: [],
+  zones: [],
+  rrsets: [],
 }
 
 function seed() {
@@ -554,6 +556,199 @@ function storageBoxes(res, { parts, method, body, q, project, ok, headers }) {
   return error(res, 404, "not_found", `${method} /v1/${parts.join("/")} is not in the mock`)
 }
 
+/* ------------------------------------------------------------------ dns zones */
+
+// DNS zones are part of the Cloud API (/v1/zones). A record set is named by its
+// name and type ("www/A"); its values are in zone file form, TXT text quoted.
+
+const NAMESERVERS = ["hydrogen.ns.hetzner.com", "oxygen.ns.hetzner.com", "helium.ns.hetzner.de"]
+const RRSET_TYPES = ["A", "AAAA", "CAA", "CNAME", "DS", "HINFO", "HTTPS", "MX", "NS", "PTR", "RP", "SOA", "SRV", "SVCB", "TLSA", "TXT"]
+let nextZone = 70001
+
+function makeZone(project, { name, created, mode = "primary", ttl = 3600, registrar = "other", delegation = "valid", protect = false, primaries = [] }) {
+  return {
+    id: nextZone++,
+    _project: project,
+    name,
+    created,
+    mode,
+    ttl,
+    labels: {},
+    protection: { delete: protect },
+    status: "ok",
+    record_count: 0,
+    registrar,
+    primary_nameservers: primaries,
+    authoritative_nameservers: {
+      assigned: NAMESERVERS,
+      delegated: delegation === "valid" ? NAMESERVERS : delegation === "partially-valid" ? NAMESERVERS.slice(0, 1) : ["ns1.other-dns.example"],
+      delegation_last_check: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+      delegation_status: delegation,
+    },
+  }
+}
+
+function makeRRSet(zone, name, type, values, { ttl = null, protect = false } = {}) {
+  return {
+    id: `${name}/${type}`,
+    name,
+    type,
+    ttl,
+    labels: {},
+    protection: { change: protect },
+    records: values.map((v) => (typeof v === "string" ? { value: v, comment: "" } : { comment: "", ...v })),
+    zone: zone.id,
+  }
+}
+
+function seedZones() {
+  const day = 24 * 3600 * 1000
+  const example = makeZone("customers", { name: "example.com", created: "2025-09-02T09:00:00Z", registrar: "hetzner", protect: true })
+  const shop = makeZone("customers", { name: "shop.example", created: "2026-05-14T16:20:00Z", ttl: 600, delegation: "invalid" })
+  const partner = makeZone("customers", {
+    name: "partner.example",
+    created: "2026-07-01T11:00:00Z",
+    mode: "secondary",
+    delegation: "partially-valid",
+    primaries: [{ address: "192.0.2.53", port: 53, tsig_algorithm: "hmac-sha256", tsig_key: "bW9jay10c2lnLWtleS1kby1ub3Qtc2hvdw==" }],
+  })
+  const home = makeZone("personal", { name: "my-home.dev", created: "2026-02-20T19:45:00Z" })
+  state.zones.push(example, shop, partner, home)
+  const base = (zone) => [
+    makeRRSet(zone, "@", "SOA", [`hydrogen.ns.hetzner.com. dns.hetzner.com. 2026101601 86400 10800 3600000 3600`]),
+    makeRRSet(zone, "@", "NS", NAMESERVERS.map((n) => `${n}.`)),
+  ]
+  state.rrsets.push(
+    ...base(example),
+    makeRRSet(example, "@", "A", ["203.0.113.10"]),
+    makeRRSet(example, "@", "AAAA", ["2001:db8::10"]),
+    makeRRSet(example, "@", "MX", [{ value: "10 mail.example.com.", comment: "Our own mail server" }, "20 mx2.example.net."]),
+    makeRRSet(example, "@", "TXT", [`"v=spf1 mx include:_spf.example.net ~all"`]),
+    makeRRSet(example, "@", "CAA", [`0 issue "letsencrypt.org"`]),
+    makeRRSet(example, "www", "CNAME", ["example.com."], { ttl: 300 }),
+    makeRRSet(example, "mail", "A", ["203.0.113.25"]),
+    makeRRSet(example, "_dmarc", "TXT", [`"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"`]),
+    makeRRSet(example, "_sip._tcp", "SRV", ["10 5 5060 sip.example.com."]),
+    makeRRSet(example, "status", "CNAME", ["example.statuspage.example."], { protect: true }),
+    ...base(shop),
+    makeRRSet(shop, "@", "A", ["198.51.100.7"]),
+    makeRRSet(shop, "www", "A", ["198.51.100.7"]),
+    ...base(partner),
+    makeRRSet(partner, "@", "A", ["192.0.2.80"]),
+    ...base(home),
+    makeRRSet(home, "@", "A", ["192.0.2.44"]),
+    makeRRSet(home, "nas", "A", ["192.0.2.45"], { ttl: 120 }),
+    makeRRSet(home, "*.lab", "CNAME", ["my-home.dev."])
+  )
+  const past = (zone, command, at, seconds) => {
+    const started = new Date(at).getTime()
+    state.actions.push({ id: nextAction++, command, status: "success", progress: 100, started: new Date(started).toISOString(), finished: new Date(started + seconds * 1000).toISOString(), resources: [{ id: zone.id, type: "zone" }], error: null })
+  }
+  for (const zone of state.zones) past(zone, "create_zone", zone.created, 3)
+  past(example, "change_protection", "2025-09-02T09:05:00Z", 1)
+  past(example, "set_rrset_records", Date.now() - 6 * day, 2)
+  past(home, "create_rrset", Date.now() - 3 * day, 2)
+}
+seedZones()
+
+/** What Hetzner would refuse in a record set's values, or null. */
+function badRecords(type, records) {
+  if (!Array.isArray(records) || !records.length) return "records must hold at least one record"
+  for (const r of records) {
+    if (!r || typeof r.value !== "string" || !r.value.trim()) return "every record needs a value"
+    if (type === "TXT" && !/^"(?:[^"\\]|\\.)*"(?:\s+"(?:[^"\\]|\\.)*")*$/.test(r.value)) return `TXT values must be quoted: ${r.value}`
+    if (type === "A" && !/^\d{1,3}(\.\d{1,3}){3}$/.test(r.value)) return `invalid IPv4 address: ${r.value}`
+  }
+  if (type === "CNAME" && records.length > 1) return "a CNAME RRSet has exactly one record"
+  return null
+}
+
+const badTtl = (ttl) => ttl !== null && ttl !== undefined && (!Number.isInteger(ttl) || ttl < 60 || ttl > 2147483647)
+
+function zones(res, { parts, method, body, q, project, ok, headers }) {
+  const mine = state.zones.filter((z) => z._project === project)
+  const invalid = (name, message) => error(res, 422, "invalid_input", message, { fields: [{ name, messages: [message] }] })
+  const counted = (zone) => ({ ...zone, record_count: state.rrsets.filter((r) => r.zone === zone.id).reduce((n, r) => n + r.records.length, 0) })
+  if (parts.length === 1 && method === "GET") {
+    const list = q.get("name") ? mine.filter((z) => z.name === q.get("name")) : mine
+    return paginate(res, "zones", sortBy(list, q, ["id", "name", "created"]).map(counted), q, headers)
+  }
+  if (parts[1] === "actions" && parts.length === 3 && method === "GET") {
+    const action = state.actions.find((a) => a.id === Number(parts[2]) && a.resources.some((r) => r.type === "zone" && mine.some((z) => z.id === r.id)))
+    return action ? ok({ action }) : error(res, 404, "not_found", "action not found")
+  }
+  const zone = mine.find((z) => String(z.id) === parts[1] || z.name === parts[1])
+  if (!zone) return error(res, 404, "not_found", `zone with ID '${parts[1]}' not found`)
+  // Changes show at once; the action stands for the name servers catching up.
+  const act = (command, done) => {
+    zone.status = "updating"
+    return startAction(command, [{ id: zone.id, type: "zone" }], () => {
+      done?.()
+      zone.status = "ok"
+    })
+  }
+  if (parts.length === 2 && method === "GET") return ok({ zone: counted(zone) })
+  if (parts[2] === "actions" && parts.length === 3 && method === "GET") {
+    const list = state.actions.filter((a) => a.resources.some((r) => r.type === "zone" && r.id === zone.id))
+    return paginate(res, "actions", sortBy(list, q, ["id", "command", "status", "started", "finished"]), q, headers)
+  }
+  if (parts[2] === "actions" && parts.length === 4 && method === "POST") {
+    if (parts[3] === "change_ttl") {
+      if (body.ttl === null || badTtl(body.ttl)) return invalid("ttl", "ttl must be between 60 and 2147483647")
+      return ok({ action: act("change_ttl", () => (zone.ttl = body.ttl)) }, 201)
+    }
+    if (parts[3] === "change_protection") {
+      if (typeof body.delete !== "boolean") return invalid("delete", "delete must be true or false")
+      return ok({ action: act("change_protection", () => (zone.protection.delete = body.delete)) }, 201)
+    }
+    return error(res, 404, "not_found", `zone action '${parts[3]}' is not in the mock`)
+  }
+  if (parts[2] !== "rrsets") return error(res, 404, "not_found", `${method} /v1/${parts.join("/")} is not in the mock`)
+
+  const sets = state.rrsets.filter((r) => r.zone === zone.id)
+  const secondary = () => error(res, 422, "invalid_input", "the records of a secondary zone come from its primary name servers")
+  if (parts.length === 3 && method === "GET") {
+    const types = q.getAll("type")
+    const list = sets.filter((r) => (!q.get("name") || r.name === q.get("name")) && (!types.length || types.includes(r.type)))
+    return paginate(res, "rrsets", list, q, headers)
+  }
+  if (parts.length === 3 && method === "POST") {
+    if (zone.mode === "secondary") return secondary()
+    if (typeof body.name !== "string" || !/^(@|\*|(\*\.)?[a-z0-9_-]+(\.[a-z0-9_-]+)*)$/.test(body.name)) return invalid("name", "invalid RRSet name")
+    if (!RRSET_TYPES.includes(body.type) || body.type === "SOA") return invalid("type", "invalid RRSet type")
+    if (badTtl(body.ttl)) return invalid("ttl", "ttl must be between 60 and 2147483647")
+    const bad = badRecords(body.type, body.records)
+    if (bad) return invalid("records", bad)
+    if (sets.some((r) => r.name === body.name && r.type === body.type)) return error(res, 409, "uniqueness_error", "an RRSet with this name and type already exists")
+    const created = makeRRSet(zone, body.name, body.type, body.records, { ttl: body.ttl ?? null })
+    state.rrsets.push(created)
+    return ok({ rrset: created, action: act("create_rrset") }, 201)
+  }
+  const set = sets.find((r) => r.name === parts[3] && r.type === parts[4])
+  if (!set) return error(res, 404, "not_found", `RRSet '${parts[3]}/${parts[4]}' not found`)
+  if (parts.length === 5 && method === "GET") return ok({ rrset: set })
+  if (zone.mode === "secondary") return secondary()
+  if (set.protection.change) return error(res, 403, "protected", "this RRSet is protected")
+  if (parts.length === 5 && method === "DELETE") {
+    state.rrsets = state.rrsets.filter((r) => r !== set)
+    return ok({ action: act("delete_rrset") })
+  }
+  if (parts[5] === "actions" && parts.length === 7 && method === "POST") {
+    if (parts[6] === "set_records") {
+      const bad = badRecords(set.type, body.records)
+      if (bad) return invalid("records", bad)
+      set.records = body.records.map((r) => ({ value: r.value, comment: r.comment ?? "" }))
+      return ok({ action: act("set_rrset_records") }, 201)
+    }
+    if (parts[6] === "change_ttl") {
+      if (badTtl(body.ttl)) return invalid("ttl", "ttl must be between 60 and 2147483647")
+      set.ttl = body.ttl ?? null
+      return ok({ action: act("change_rrset_ttl") }, 201)
+    }
+  }
+  return error(res, 404, "not_found", `${method} /v1/${parts.join("/")} is not in the mock`)
+}
+
 /* ------------------------------------------------------------------ helpers */
 
 const rate = new Map()
@@ -658,6 +853,11 @@ const DURATIONS = {
   delete_subaccount: 2,
   reset_subaccount_password: 2,
   update_subaccount_access_settings: 2,
+  create_rrset: 2,
+  delete_rrset: 2,
+  set_rrset_records: 2,
+  change_rrset_ttl: 2,
+  change_ttl: 2,
 }
 
 /** Starts an action that runs for a while and applies `done` when it finishes. */
@@ -964,6 +1164,8 @@ async function handle(req, res) {
   // --- catalog
   // --- storage boxes
   if (parts[0] === "storage_boxes") return storageBoxes(res, { parts, method, body, q, project, ok, headers })
+  // --- dns zones
+  if (parts[0] === "zones") return zones(res, { parts: parts.map(decodeURIComponent), method, body, q, project, ok, headers })
 
   if (parts[0] === "server_types" && parts.length === 1 && method === "GET") return paginate(res, "server_types", SERVER_TYPES, q, headers)
   if (parts[0] === "locations" && parts.length === 1 && method === "GET") return paginate(res, "locations", Object.values(LOCATIONS), q, headers)
