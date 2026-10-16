@@ -6,7 +6,7 @@
 //
 // Then, in the panel: Settings → API address → http://localhost:4010/v1, and add
 // one of the tokens printed at start as a project. Servers, actions, images,
-// metrics, firewalls and a small VNC console behave like the real API, closely
+// metrics, firewalls, Storage Boxes and a small VNC console behave like the real API, closely
 // enough to click through every screen. For dedicated servers, set Settings →
 // Robot accounts → Webservice address to http://localhost:4010/robot and add a
 // webservice user printed at start (see mock-robot.mjs). Everything is kept in
@@ -204,6 +204,9 @@ const state = {
   firewalls: [],
   volumes: [],
   networks: [],
+  storageBoxes: [],
+  boxSnapshots: [],
+  subaccounts: [],
 }
 
 function seed() {
@@ -347,6 +350,210 @@ function seed() {
 }
 seed()
 
+/* ------------------------------------------------------------------ storage boxes */
+
+// Storage Boxes belong to the Hetzner API (api.hetzner.com/v1). The panel sends
+// them here too once its API address points at the mock.
+
+function boxType(name, tb, monthly) {
+  const price = (net) => ({ net: net.toFixed(4), gross: (net * 1.19).toFixed(4) })
+  const big = tb > 1
+  return {
+    name,
+    description: name.toUpperCase(),
+    size: tb * TB,
+    snapshot_limit: big ? 20 : 10,
+    automatic_snapshot_limit: big ? 20 : 10,
+    subaccounts_limit: big ? 200 : 100,
+    prices: eu.map((location) => ({ location, price_monthly: price(monthly), price_hourly: price(monthly / 730), setup_fee: price(0) })),
+    deprecation: null,
+  }
+}
+
+const BOX_TYPES = [boxType("bx11", 1, 3.2), boxType("bx21", 5, 10.9), boxType("bx31", 10, 20.8)]
+let nextBox = 480000
+let nextBoxPart = 1200
+
+function makeBox(project, { name, type, location, used, created, access = {}, plan = null, protect = false }) {
+  const id = nextBox++
+  const t = BOX_TYPES.find((b) => b.name === type)
+  const bytes = Math.round(used * t.size)
+  return {
+    id,
+    name,
+    username: `u${id}`,
+    status: "active",
+    server: `u${id}.your-storagebox.de`,
+    system: `${location.toUpperCase()}-BX${(id % 900) + 100}`,
+    storage_box_type: t,
+    location: LOCATIONS[location],
+    access_settings: { reachable_externally: false, samba_enabled: false, ssh_enabled: true, webdav_enabled: false, zfs_enabled: false, ...access },
+    snapshot_plan: plan,
+    stats: { size: bytes, size_data: Math.round(bytes * 0.88), size_snapshots: Math.round(bytes * 0.12) },
+    labels: {},
+    protection: { delete: protect },
+    created,
+    _project: project,
+    _subs: 0,
+  }
+}
+
+function makeSnapshot(box, { description = "", automatic = false, created = new Date().toISOString() } = {}) {
+  return {
+    id: nextBoxPart++,
+    name: created.slice(0, 19).replace(/:/g, "-"),
+    description,
+    is_automatic: automatic,
+    stats: { size: Math.round(box.stats.size_snapshots / 6) + crypto.randomInt(2 ** 30), size_filesystem: box.stats.size_data },
+    labels: {},
+    created,
+    storage_box: box.id,
+  }
+}
+
+function makeSubaccount(box, { home_directory, description = "", access = {} }) {
+  const username = `${box.username}-sub${++box._subs}`
+  return {
+    id: nextBoxPart++,
+    username,
+    home_directory,
+    server: `${username}.your-storagebox.de`,
+    access_settings: { reachable_externally: false, samba_enabled: false, ssh_enabled: true, webdav_enabled: false, readonly: false, ...access },
+    description,
+    labels: {},
+    created: new Date().toISOString(),
+    storage_box: box.id,
+  }
+}
+
+function seedStorage() {
+  const day = 24 * 3600 * 1000
+  const plan = { max_snapshots: 7, minute: 0, hour: 3, day_of_week: null, day_of_month: null }
+  const backups = makeBox("customers", { name: "backups", type: "bx21", location: "fsn1", used: 0.62, created: "2025-11-10T10:00:00Z", access: { samba_enabled: true, zfs_enabled: true }, plan, protect: true })
+  const media = makeBox("customers", { name: "media-archive", type: "bx31", location: "hel1", used: 0.93, created: "2026-03-30T14:30:00Z", access: { webdav_enabled: true, reachable_externally: true } })
+  const home = makeBox("personal", { name: "home-backup", type: "bx11", location: "nbg1", used: 0.18, created: "2026-06-08T08:15:00Z" })
+  state.storageBoxes.push(backups, media, home)
+  for (let i = 1; i <= 4; i++) {
+    const at = new Date(Date.now() - i * day)
+    at.setUTCHours(3, 0, 0, 0)
+    state.boxSnapshots.push(makeSnapshot(backups, { automatic: true, created: at.toISOString() }))
+  }
+  state.boxSnapshots.push(makeSnapshot(backups, { description: "Before the database move", created: new Date(Date.now() - 12 * day).toISOString() }))
+  state.subaccounts.push(
+    makeSubaccount(backups, { home_directory: "servers/web-01", description: "web-01, nightly rsync" }),
+    makeSubaccount(backups, { home_directory: "servers/mail" }),
+    makeSubaccount(media, { home_directory: "photos", description: "The gallery", access: { readonly: true, webdav_enabled: true } })
+  )
+  const past = (box, command, at, seconds) => {
+    const started = new Date(at).getTime()
+    const resources = [{ id: box.id, type: "storage_box" }]
+    state.actions.push({ id: nextAction++, command, status: "success", progress: 100, started: new Date(started).toISOString(), finished: new Date(started + seconds * 1000).toISOString(), resources, error: null })
+  }
+  past(backups, "create_storage_box", backups.created, 45)
+  past(backups, "enable_snapshot_plan", "2025-11-10T10:20:00Z", 1)
+  past(backups, "update_access_settings", Date.now() - 30 * day, 2)
+  past(media, "create_storage_box", media.created, 50)
+  past(home, "create_storage_box", home.created, 40)
+}
+seedStorage()
+
+function weakBoxPassword(password) {
+  if (typeof password !== "string" || password.length < 12 || password.length > 128) return "password must be 12 to 128 characters long"
+  if (![/[A-Z]/, /[a-z]/, /\d/, /[^A-Za-z0-9]/].every((re) => re.test(password))) return "password needs an upper and a lower case letter, a digit and a special character"
+  return null
+}
+
+function storageBoxes(res, { parts, method, body, q, project, ok, headers }) {
+  const boxes = state.storageBoxes.filter((b) => b._project === project)
+  const invalid = (name, message) => error(res, 422, "invalid_input", message, { fields: [{ name, messages: [message] }] })
+  const pick = (keys) => Object.fromEntries(keys.filter((k) => typeof body[k] === "boolean").map((k) => [k, body[k]]))
+  if (parts.length === 1 && method === "GET") return paginate(res, "storage_boxes", sortBy(boxes, q, ["id", "name", "created"]), q, headers)
+  if (parts[1] === "actions" && parts.length === 3 && method === "GET") {
+    const action = state.actions.find((a) => a.id === Number(parts[2]) && a.resources.some((r) => r.type === "storage_box" && boxes.some((b) => b.id === r.id)))
+    return action ? ok({ action }) : error(res, 404, "not_found", "action not found")
+  }
+  const box = boxes.find((b) => b.id === Number(parts[1]))
+  if (!box) return error(res, 404, "not_found", `storage box with ID '${parts[1]}' not found`)
+  const act = (command, done, extra = []) => startAction(command, [{ id: box.id, type: "storage_box" }, ...extra], done)
+  if (parts.length === 2 && method === "GET") return ok({ storage_box: box })
+  if (parts[2] === "actions" && parts.length === 3 && method === "GET") {
+    const list = state.actions.filter((a) => a.resources.some((r) => r.type === "storage_box" && r.id === box.id))
+    return paginate(res, "actions", sortBy(list, q, ["id", "command", "status", "started", "finished"]), q, headers)
+  }
+  if (parts[2] === "actions" && parts.length === 4 && method === "POST") {
+    const command = parts[3]
+    if (command === "reset_password") {
+      const weak = weakBoxPassword(body.password)
+      return weak ? invalid("password", weak) : ok({ action: act(command) }, 201)
+    }
+    if (command === "update_access_settings") {
+      const change = pick(["reachable_externally", "samba_enabled", "ssh_enabled", "webdav_enabled", "zfs_enabled"])
+      return ok({ action: act(command, () => Object.assign(box.access_settings, change)) }, 201)
+    }
+    if (command === "enable_snapshot_plan") {
+      const { max_snapshots, hour, minute, day_of_week = null, day_of_month = null } = body
+      if (![max_snapshots, hour, minute].every(Number.isInteger)) return invalid("max_snapshots", "max_snapshots, hour and minute are required")
+      const limit = box.storage_box_type.automatic_snapshot_limit
+      if (max_snapshots > limit) return invalid("max_snapshots", `max_snapshots can be at most ${limit}`)
+      return ok({ action: act(command, () => (box.snapshot_plan = { max_snapshots, minute, hour, day_of_week, day_of_month })) }, 201)
+    }
+    if (command === "disable_snapshot_plan") return ok({ action: act(command, () => (box.snapshot_plan = null)) }, 201)
+    if (command === "rollback_snapshot") {
+      const snap = state.boxSnapshots.find((s) => s.storage_box === box.id && (s.id === body.snapshot || s.name === body.snapshot))
+      if (!snap) return error(res, 404, "not_found", "snapshot not found")
+      const keep = (s) => s.storage_box !== box.id || s.created <= snap.created
+      return ok({ action: act(command, () => (state.boxSnapshots = state.boxSnapshots.filter(keep))) }, 201)
+    }
+    if (command === "change_protection") {
+      if (typeof body.delete !== "boolean") return invalid("delete", "delete is required")
+      return ok({ action: act(command, () => (box.protection.delete = body.delete)) }, 201)
+    }
+    return error(res, 404, "not_found", `storage box action '${command}' is not in the mock`)
+  }
+  if (parts[2] === "snapshots") {
+    const snaps = state.boxSnapshots.filter((s) => s.storage_box === box.id)
+    if (parts.length === 3 && method === "GET") return ok({ snapshots: sortBy(snaps, q, ["id", "name", "created"]) })
+    if (parts.length === 3 && method === "POST") {
+      const limit = box.storage_box_type.snapshot_limit
+      if (snaps.filter((s) => !s.is_automatic).length >= limit) return error(res, 403, "resource_limit_exceeded", `this Storage Box keeps at most ${limit} manual snapshots`)
+      const snapshot = makeSnapshot(box, { description: typeof body.description === "string" ? body.description : "" })
+      return ok({ snapshot: { id: snapshot.id, storage_box: box.id }, action: act("create_snapshot", () => state.boxSnapshots.push(snapshot)) }, 201)
+    }
+    const snap = snaps.find((s) => s.id === Number(parts[3]))
+    if (!snap) return error(res, 404, "not_found", `snapshot with ID '${parts[3]}' not found`)
+    if (parts.length === 4 && method === "GET") return ok({ snapshot: snap })
+    if (parts.length === 4 && method === "DELETE") return ok({ action: act("delete_snapshot", () => (state.boxSnapshots = state.boxSnapshots.filter((s) => s !== snap))) })
+  }
+  if (parts[2] === "subaccounts") {
+    const subs = state.subaccounts.filter((s) => s.storage_box === box.id)
+    if (parts.length === 3 && method === "GET") return ok({ subaccounts: subs })
+    if (parts.length === 3 && method === "POST") {
+      if (typeof body.home_directory !== "string" || !body.home_directory.trim()) return invalid("home_directory", "home_directory is required")
+      const weak = weakBoxPassword(body.password)
+      if (weak) return invalid("password", weak)
+      if (subs.length >= box.storage_box_type.subaccounts_limit) return error(res, 403, "resource_limit_exceeded", "this Storage Box has all the sub-accounts it can have")
+      const description = typeof body.description === "string" ? body.description : ""
+      const sub = makeSubaccount(box, { home_directory: body.home_directory, description, access: body.access_settings ?? {} })
+      const action = act("create_subaccount", () => state.subaccounts.push(sub), [{ id: sub.id, type: "storage_box_subaccount" }])
+      return ok({ subaccount: { id: sub.id, storage_box: box.id }, action }, 201)
+    }
+    const sub = subs.find((s) => s.id === Number(parts[3]))
+    if (!sub) return error(res, 404, "not_found", `subaccount with ID '${parts[3]}' not found`)
+    const mine = [{ id: sub.id, type: "storage_box_subaccount" }]
+    if (parts.length === 4 && method === "GET") return ok({ subaccount: sub })
+    if (parts.length === 4 && method === "DELETE") return ok({ action: act("delete_subaccount", () => (state.subaccounts = state.subaccounts.filter((s) => s !== sub)), mine) })
+    if (parts[4] === "actions" && parts[5] === "reset_subaccount_password" && method === "POST") {
+      const weak = weakBoxPassword(body.password)
+      return weak ? invalid("password", weak) : ok({ action: act("reset_subaccount_password", null, mine) }, 201)
+    }
+    if (parts[4] === "actions" && parts[5] === "update_access_settings" && method === "POST") {
+      const change = pick(["reachable_externally", "samba_enabled", "ssh_enabled", "webdav_enabled", "readonly"])
+      return ok({ action: act("update_subaccount_access_settings", () => Object.assign(sub.access_settings, change), mine) }, 201)
+    }
+  }
+  return error(res, 404, "not_found", `${method} /v1/${parts.join("/")} is not in the mock`)
+}
+
 /* ------------------------------------------------------------------ helpers */
 
 const rate = new Map()
@@ -441,6 +648,16 @@ const DURATIONS = {
   set_firewall_rules: 3,
   apply_firewall: 3,
   remove_firewall: 3,
+  update_access_settings: 2,
+  enable_snapshot_plan: 1,
+  disable_snapshot_plan: 1,
+  create_snapshot: 3,
+  delete_snapshot: 2,
+  rollback_snapshot: 6,
+  create_subaccount: 2,
+  delete_subaccount: 2,
+  reset_subaccount_password: 2,
+  update_subaccount_access_settings: 2,
 }
 
 /** Starts an action that runs for a while and applies `done` when it finishes. */
@@ -745,6 +962,9 @@ async function handle(req, res) {
   }
 
   // --- catalog
+  // --- storage boxes
+  if (parts[0] === "storage_boxes") return storageBoxes(res, { parts, method, body, q, project, ok, headers })
+
   if (parts[0] === "server_types" && parts.length === 1 && method === "GET") return paginate(res, "server_types", SERVER_TYPES, q, headers)
   if (parts[0] === "locations" && parts.length === 1 && method === "GET") return paginate(res, "locations", Object.values(LOCATIONS), q, headers)
   if (parts[0] === "pricing" && method === "GET") return ok({ pricing: { currency: "EUR", vat_rate: "19.00" } })

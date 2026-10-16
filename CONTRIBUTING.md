@@ -23,7 +23,7 @@ Open http://localhost:3000 (use `localhost`, not `127.0.0.1`: the dev server onl
 
 ### Without a Hetzner account
 
-`npm run mock` starts a fake Hetzner Cloud API on http://localhost:4010 with two projects, eight servers, snapshots, firewalls, metrics and a small VNC console. In the panel, open *Settings → API address*, enter `http://localhost:4010/v1`, and add the tokens the mock prints as projects. Plain `http` is accepted only for an address on this machine.
+`npm run mock` starts a fake Hetzner Cloud API on http://localhost:4010 with two projects, eight servers, three Storage Boxes, snapshots, firewalls, metrics and a small VNC console. In the panel, open *Settings → API address*, enter `http://localhost:4010/v1`, and add the tokens the mock prints as projects. Plain `http` is accepted only for an address on this machine. Storage Boxes, which really live in the Hetzner API at `api.hetzner.com`, are served by the mock under the same address.
 
 The same mock serves a fake Hetzner Robot webservice under http://localhost:4010/robot, with two Robot accounts and five dedicated servers: one with a rescue boot waiting, one that reports its power state, a cancelled auction server and one still being set up. Open *Settings → Robot accounts → Webservice address*, enter `http://localhost:4010/robot`, and add the webservice users and passwords the mock prints. Resets, rescue and Linux boots, reverse DNS, traffic and SSH keys behave like Robot's (`scripts/mock-robot.mjs`).
 
@@ -33,16 +33,18 @@ Actions in the mock take a few seconds and change the servers the way Hetzner wo
 
 | Path | What it holds |
 | --- | --- |
-| `src/lib/hetzner.ts` | The only code that talks to the Hetzner Cloud API, including the outbound proxy and rate limit tracking. Its `send()` is also what the Robot client goes out through. |
+| `src/lib/hetzner.ts` | The only code that talks to the Hetzner Cloud API and, for Storage Boxes, the Hetzner API (`api: "hetzner"`), including the outbound proxy and rate limit tracking. Its `send()` is also what the Robot client goes out through. |
 | `src/lib/robot.ts` | The only code that talks to the Hetzner Robot webservice: basic auth, form-encoded bodies and Robot's error codes. |
 | `src/lib/operations.ts` | Everything users can do with a cloud server. A new feature usually starts here: each operation checks its input and permission and says what to log. |
 | `src/lib/dedicated-operations.ts` | The same for dedicated servers: resets, Wake on LAN, rescue and Linux boots, reverse DNS and traffic. |
-| `src/lib/gateway.ts` | The one gateway both kinds of server go through: session, assignment, operation, permission, activity log. |
-| `src/lib/servers.ts`, `src/lib/dedicated.ts` | Server lists and their caches, for cloud and dedicated servers. A server is always named by its kind (`cloud` or `dedicated`), its project or Robot account, and its ID. |
+| `src/lib/storage-operations.ts` | The same for Storage Boxes: access settings, passwords, snapshots and sub-accounts. |
+| `src/lib/gateway.ts` | The one gateway every kind of server goes through: session, assignment, operation, permission, activity log. |
+| `src/lib/servers.ts`, `src/lib/dedicated.ts`, `src/lib/storage.ts` | Server lists and their caches, for cloud servers, dedicated servers and Storage Boxes. A server is always named by its kind (`cloud`, `dedicated` or `storage`), its project or Robot account, and its ID. |
 | `src/lib/permissions.ts` | The switches under *Settings → What users can do*. |
 | `src/lib/db.ts` | SQLite schema and numbered migrations. Never edit a migration that has shipped; add a new one. |
 | `src/app/api/` | Route handlers. Every one goes through `route()` in `src/lib/http.ts`. |
 | `src/components/server/` | The server page tabs; `dedicated/` holds the dedicated server page. |
+| `src/components/storage/` | The Storage Box page. |
 | `src/components/console/` | The noVNC console. |
 | `src/components/ui/` | shadcn/ui components. |
 | `scripts/mock-hetzner.mjs`, `scripts/mock-robot.mjs` | The fake Hetzner Cloud API and Robot webservice for development. |

@@ -44,7 +44,7 @@ export function MyServers({ name }: { name: string }) {
               >
                 <div className="col-span-12 min-w-0 md:col-span-4">
                   <p className="text-[13px] text-muted-foreground">
-                    {s.kind === "dedicated" ? "Dedicated server" : "Cloud server"}
+                    {s.kind === "dedicated" ? "Dedicated server" : s.kind === "storage" ? "Storage Box" : "Cloud server"}
                     {s.type ? ` ${s.type}` : ""}
                   </p>
                   <p className="display mt-1 truncate text-2xl md:text-3xl">{s.name}</p>
@@ -54,8 +54,8 @@ export function MyServers({ name }: { name: string }) {
                 ) : (
                   <>
                     <div className="col-span-6 min-w-0 md:col-span-2">
-                      <p className="text-[13px] text-muted-foreground">IP address</p>
-                      <p className="mt-0.5 truncate text-base tabular">{s.ipv4 ?? s.ipv6 ?? "—"}</p>
+                      <p className="text-[13px] text-muted-foreground">{s.kind === "storage" ? "Host" : "IP address"}</p>
+                      <p className="mt-0.5 truncate text-base tabular">{s.host ?? s.ipv4 ?? s.ipv6 ?? "—"}</p>
                     </div>
                     <div className="col-span-6 min-w-0 md:col-span-2">
                       <p className="text-[13px] text-muted-foreground">Location</p>
@@ -65,7 +65,7 @@ export function MyServers({ name }: { name: string }) {
                       </p>
                     </div>
                     <div className="col-span-9 min-w-0 md:col-span-3">
-                      <p className="text-[13px] text-muted-foreground">{s.kind === "dedicated" ? "Status" : (s.os ?? "System")}</p>
+                      <p className="text-[13px] text-muted-foreground">{s.kind === "cloud" ? (s.os ?? "System") : "Status"}</p>
                       <StateMark state={s.status} className="mt-1 text-base" label={s.rescue ? "Rescue mode on" : undefined} />
                     </div>
                   </>

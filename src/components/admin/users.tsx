@@ -360,7 +360,7 @@ function EditUserForm({
                       {s.label || `Server ${s.server_id}`}
                       <span className="text-muted-foreground tabular">
                         {" "}
-                        · {s.kind === "dedicated" ? "dedicated" : "cloud"} #{s.server_id}
+                        · {s.kind === "dedicated" ? "dedicated" : s.kind === "storage" ? "storage box" : "cloud"} #{s.server_id}
                       </span>
                     </Link>
                     <Button type="button" size="icon-xs" variant="ghost" aria-label="Unassign" onClick={() => unassign(s)}>

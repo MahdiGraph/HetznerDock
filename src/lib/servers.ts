@@ -6,6 +6,7 @@ import { hzFetchAll, hzRequest, HetznerError } from "./hetzner"
 import { cleanupTemporaryKeys } from "./rescue-keys"
 import { accountServers, cachedDedicatedName, summarizeDedicated } from "./dedicated"
 import { serverKey, summarize, type Dict, type ServerKind, type ServerSummary } from "./summary"
+import { cachedStorageName, projectStorageBoxes, summarizeStorage } from "./storage"
 
 export type Assignee = { userId: number; username: string; name: string | null }
 
@@ -97,7 +98,12 @@ export function cachedServerName(projectId: number, serverId: number): string | 
 
 /** The server's name without asking Hetzner: the cached list, else the name it had when it was assigned. */
 export function knownServerName(kind: ServerKind, projectId: number, serverId: number): string | null {
-  const cachedName = kind === "cloud" ? cachedServerName(projectId, serverId) : cachedDedicatedName(projectId, serverId)
+  const cachedName =
+    kind === "cloud"
+      ? cachedServerName(projectId, serverId)
+      : kind === "storage"
+        ? cachedStorageName(projectId, serverId)
+        : cachedDedicatedName(projectId, serverId)
   if (cachedName) return cachedName
   const row = db()
     .prepare("SELECT label FROM assignments WHERE kind = ? AND project_id = ? AND server_id = ? AND label IS NOT NULL LIMIT 1")
@@ -113,9 +119,10 @@ const failure = (e: unknown) => (e instanceof HetznerError ? e.message : "Could 
 export async function listAllServers(refresh = false, admin = false) {
   const projects = listProjects()
   const accounts = listRobotAccounts()
-  const [cloud, dedicated] = await Promise.all([
+  const [cloud, dedicated, boxes] = await Promise.all([
     Promise.allSettled(projects.map((p) => projectServers(p.id, refresh))),
     Promise.allSettled(accounts.map((a) => accountServers(a.id, refresh))),
+    Promise.allSettled(projects.map((p) => projectStorageBoxes(p.id, refresh))),
   ])
   const servers: ServerSummary[] = []
   const errors: ListError[] = []
@@ -129,6 +136,11 @@ export async function listAllServers(refresh = false, admin = false) {
     if (r.status === "fulfilled") servers.push(...r.value.map((raw) => summarizeDedicated(raw, account, { admin })))
     else errors.push({ kind: "dedicated", projectId: account.id, project: account.name, message: failure(r.reason) })
   })
+  boxes.forEach((r, i) => {
+    const project = { id: projects[i].id, name: projects[i].name }
+    if (r.status === "fulfilled") servers.push(...r.value.map((raw) => summarizeStorage(raw, project)))
+    else errors.push({ kind: "storage", projectId: project.id, project: `${project.name} (Storage Boxes)`, message: failure(r.reason) })
+  })
   return { servers, errors }
 }
 
@@ -139,13 +151,19 @@ export async function listUserServers(user: User): Promise<UserServer[]> {
   const rows = db()
     .prepare("SELECT kind, project_id, server_id, label, nickname FROM assignments WHERE user_id = ? ORDER BY created_at")
     .all(user.id) as { kind: ServerKind; project_id: number; server_id: number; label: string | null; nickname: string | null }[]
-  const names = { cloud: projectNames(), dedicated: robotAccountNames() }
+  const names = { cloud: projectNames(), dedicated: robotAccountNames(), storage: projectNames() }
   const owners = new Map(rows.map((r) => [`${r.kind}:${r.project_id}`, { kind: r.kind, id: r.project_id }]))
   const lists = new Map<string, { raw?: Dict[]; error?: string }>()
   await Promise.all(
     [...owners].map(async ([key, owner]) => {
       try {
-        lists.set(key, { raw: owner.kind === "cloud" ? await projectServers(owner.id) : await accountServers(owner.id) })
+        const raw =
+          owner.kind === "cloud"
+            ? await projectServers(owner.id)
+            : owner.kind === "storage"
+              ? await projectStorageBoxes(owner.id)
+              : await accountServers(owner.id)
+        lists.set(key, { raw })
       } catch (e) {
         lists.set(key, { error: e instanceof HetznerError ? e.message : "Could not load this server." })
       }
@@ -155,10 +173,11 @@ export async function listUserServers(user: User): Promise<UserServer[]> {
   return rows.map((row) => {
     const owner = { id: row.project_id, name: names[row.kind].get(row.project_id) ?? "Hetzner" }
     const list = lists.get(`${row.kind}:${row.project_id}`)
-    const idOf = (s: Dict) => Number(row.kind === "cloud" ? s.id : s.server_number)
+    const idOf = (s: Dict) => Number(row.kind === "dedicated" ? s.server_number : s.id)
     const raw = list?.raw?.find((s) => idOf(s) === row.server_id)
     if (raw) {
-      const summary = row.kind === "cloud" ? summarize(raw, owner) : summarizeDedicated(raw, owner)
+      const summary =
+        row.kind === "cloud" ? summarize(raw, owner) : row.kind === "storage" ? summarizeStorage(raw, owner) : summarizeDedicated(raw, owner)
       // The user's own name for the server wins over the Hetzner name.
       return { ...summary, name: row.nickname || summary.name, nickname: row.nickname }
     }

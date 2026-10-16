@@ -128,6 +128,25 @@ const MIGRATIONS: ((db: DB) => void)[] = [
       UPDATE audit_logs SET server_kind = 'cloud' WHERE server_id IS NOT NULL;
     `)
   },
+  // 2. Storage Boxes of a Hetzner project can be assigned like servers (kind 'storage').
+  (db) => {
+    db.exec(`
+      CREATE TABLE assignments_new (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('cloud', 'dedicated', 'storage')),
+        project_id INTEGER NOT NULL,
+        server_id INTEGER NOT NULL,
+        label TEXT,
+        nickname TEXT,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, kind, project_id, server_id)
+      );
+      INSERT INTO assignments_new SELECT user_id, kind, project_id, server_id, label, nickname, created_at FROM assignments;
+      DROP TABLE assignments;
+      ALTER TABLE assignments_new RENAME TO assignments;
+      CREATE INDEX assignments_server ON assignments(kind, project_id, server_id);
+    `)
+  },
 ]
 
 function migrate(db: DB) {

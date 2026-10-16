@@ -9,6 +9,7 @@ export type ProxyProtocol = (typeof PROXY_PROTOCOLS)[number]
 
 export const DEFAULT_BASE_URL = "https://api.hetzner.cloud/v1"
 export const DEFAULT_ROBOT_URL = "https://robot-ws.your-server.de"
+export const DEFAULT_HETZNER_API_URL = "https://api.hetzner.com/v1"
 
 export type ProxySettings = {
   enabled: boolean
@@ -44,6 +45,15 @@ export function getBaseUrl(): string {
 
 export function saveBaseUrl(baseUrl: string) {
   set("hz.baseUrl", baseUrl === DEFAULT_BASE_URL ? null : baseUrl)
+}
+
+/**
+ * The Hetzner API that serves Storage Boxes, with the same project tokens as the
+ * Cloud API. A custom Cloud API address (a mock) is used for both.
+ */
+export function getHetznerApiUrl(): string {
+  const cloud = getBaseUrl()
+  return cloud === DEFAULT_BASE_URL ? DEFAULT_HETZNER_API_URL : cloud
 }
 
 /** The Hetzner Robot webservice address, shared by every Robot account. */

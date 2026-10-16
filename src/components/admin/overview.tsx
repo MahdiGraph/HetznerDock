@@ -19,7 +19,10 @@ function useServers(enabled: boolean) {
 
 function Count({ enabled }: { enabled: boolean }) {
   const { data, error, isLoading } = useServers(enabled)
-  const servers = data?.servers ?? []
+  const all = data?.servers ?? []
+  // Storage Boxes are counted on their own line.
+  const servers = all.filter((s) => s.kind !== "storage")
+  const boxes = all.length - servers.length
   const dedicated = servers.filter((s) => s.kind === "dedicated").length
   const running = servers.filter((s) => s.kind === "cloud" && s.status === "running").length
   const shared = servers.filter((s) => s.assignees.length > 0).length
@@ -44,6 +47,11 @@ function Count({ enabled }: { enabled: boolean }) {
                     ? `${servers.length - dedicated} cloud · ${dedicated} dedicated · ${shared} shared`
                     : `${running} running · ${shared} shared`}
               </p>
+              {boxes ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  and {boxes} Storage Box{boxes === 1 ? "" : "es"}
+                </p>
+              ) : null}
               {data?.errors.length ? (
                 <p className="mt-1 text-sm text-destructive">
                   {data.errors.map((e) => e.project).join(", ")} could not be loaded

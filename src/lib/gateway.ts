@@ -9,6 +9,8 @@ import { getProject } from "./projects"
 import { getRobotAccount } from "./robot-accounts"
 import { canAccess, invalidateProject, knownServerName } from "./servers"
 import { getPermissions } from "./settings"
+import { invalidateStorage } from "./storage"
+import { STORAGE_OPERATIONS } from "./storage-operations"
 import type { ServerKind } from "./summary"
 
 type Ctx = { params: Promise<{ project: string; id: string; path?: string[] }> }
@@ -23,6 +25,7 @@ const KINDS = {
     unknown: "Unknown Robot account.",
     invalidate: invalidateAccount,
   },
+  storage: { owner: getProject, operations: STORAGE_OPERATIONS, unknown: "Unknown Hetzner project.", invalidate: invalidateStorage },
 }
 
 /**

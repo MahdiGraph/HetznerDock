@@ -49,7 +49,9 @@ function qs(query?: Query) {
 
 /** Address of a server page in the panel; for a dedicated server, project is its Robot account. */
 export function serverHref(kind: ServerKind, project: number, id: number) {
-  return kind === "dedicated" ? `/servers/dedicated/${project}/${id}` : `/servers/${project}/${id}`
+  if (kind === "dedicated") return `/servers/dedicated/${project}/${id}`
+  if (kind === "storage") return `/servers/storage/${project}/${id}`
+  return `/servers/${project}/${id}`
 }
 
 /** Address of the full-window console of a server. */
@@ -85,6 +87,15 @@ export function robotCall<T = unknown>(
   body?: unknown
 ) {
   return api<T>(robotUrl(account, number, sub), { method, body })
+}
+
+/** A call for one Storage Box (a Hetzner project and the box's ID) through the panel's gateway. */
+export function storageUrl(project: number, id: number, sub = "", query?: Query) {
+  return `/api/hz/storage/${project}/${id}${sub ? `/${sub}` : ""}${qs(query)}`
+}
+
+export function storageCall<T = unknown>(project: number, id: number, method: "GET" | "POST" | "PUT" | "DELETE", sub = "", body?: unknown) {
+  return api<T>(storageUrl(project, id, sub), { method, body })
 }
 
 export function errorMessage(e: unknown) {
