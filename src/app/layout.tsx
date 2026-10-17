@@ -13,7 +13,7 @@ const sourceSerif = Source_Serif_4({ subsets: ["latin"], variable: "--font-sourc
 
 export const metadata: Metadata = {
   title: { default: "Hetzner Dock", template: "%s · Hetzner Dock" },
-  description: "Self-hosted panel for sharing Hetzner Cloud servers with the people who use them.",
+  description: "Self-hosted panel for sharing Hetzner Cloud servers, dedicated servers, Storage Boxes and DNS zones with the people who use them.",
   robots: { index: false, follow: false },
 }
 
