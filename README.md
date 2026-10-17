@@ -6,7 +6,7 @@
 
 **A self-hosted control panel for sharing Hetzner Cloud servers, dedicated servers, Storage Boxes and DNS zones with your customers, friends and team.**
 
-Everyone gets their own login to restart, rebuild, rescue and watch *their* servers, cloud servers with the console right in the browser and dedicated servers from Hetzner Robot. Nobody needs your Hetzner account.
+Everyone gets their own login to restart, rebuild, rescue and watch *their* servers: cloud servers with the console right in the browser, dedicated servers from Hetzner Robot, Storage Boxes for their backups and DNS zones for their domains. Nobody needs your Hetzner account.
 
 [![Release](https://img.shields.io/github/v/release/MahdiGraph/HetznerDock?style=flat-square&color=85aed0)](https://github.com/MahdiGraph/HetznerDock/releases)
 [![Docker image](https://img.shields.io/github/actions/workflow/status/MahdiGraph/HetznerDock/docker.yml?branch=main&style=flat-square&label=docker%20image)](https://github.com/MahdiGraph/HetznerDock/actions/workflows/docker.yml)
@@ -315,7 +315,14 @@ docker rm -f hetznerdock && docker volume rm hetznerdock_data
 <details>
 <summary><b>Is this an official Hetzner product?</b></summary>
 
-No. Hetzner Dock is an independent open-source project that talks to the public [Hetzner Cloud API](https://docs.hetzner.cloud/) and the [Hetzner Robot webservice](https://robot.hetzner.com/doc/webservice/en.html). It is not affiliated with or supported by Hetzner Online GmbH.
+No. Hetzner Dock is an independent open-source project that talks to the public [Hetzner Cloud API](https://docs.hetzner.cloud/), the [Hetzner API](https://docs.hetzner.cloud/reference/hetzner) for Storage Boxes and DNS zones, and the [Hetzner Robot webservice](https://robot.hetzner.com/doc/webservice/en.html). It is not affiliated with or supported by Hetzner Online GmbH.
+
+</details>
+
+<details>
+<summary><b>Can I use it as a reseller or customer panel for Hetzner?</b></summary>
+
+Yes, that is what it is made for. The servers, Storage Boxes and DNS zones stay in your Hetzner account, and each customer gets a login that reaches only the ones you assign, through a fixed list of operations. Hetzner Dock does no billing, so keep using whatever you invoice with.
 
 </details>
 
